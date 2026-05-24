@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GYM CONTROL</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ===== SELECCIÓN DE SUCURSAL ===== -->
+<div class="screen active" id="screen-home">
+  <div class="home-inner">
+    <div class="logo-area">
+      <div class="logo-title">GYM CONTROL</div>
+      <div class="logo-sub">Sistema de gestión operativa</div>
+    </div>
+    <div class="suc-label">Selecciona tu sucursal</div>
+    <div class="suc-grid">
+      <div class="suc-card" onclick="selectSuc('UPEA')">
+        <div class="suc-name">Sucursal UPEA</div>
+      </div>
+      <div class="suc-card" onclick="selectSuc('16 DE JULIO')">
+        <div class="suc-name">Sucursal 16 de Julio</div>
+      </div>
+      <div class="suc-card" onclick="selectSuc('SATÉLITE')">
+        <div class="suc-name">Sucursal Satélite</div>
+      </div>
+      <div class="suc-card" onclick="selectSuc('CRUCE V. ADELA')">
+        <div class="suc-name">Sucursal Cruce V. Adela</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LOGIN ===== -->
+<div class="screen" id="screen-login">
+  <div class="login-box">
+    <div class="login-back" onclick="goHome()">← Volver</div>
+    <div class="login-suc" id="login-suc-name"></div>
+    <div class="login-title">Ingresa tus credenciales</div>
+    <div class="field">
+      <label>Usuario</label>
+      <input type="text" id="inp-user" placeholder="tu usuario" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="inp-pass" placeholder="••••••••">
+    </div>
+    <button class="btn-primary" onclick="doLogin()">Ingresar</button>
+    <div class="login-err" id="login-err">Usuario o contraseña incorrectos</div>
+  </div>
+</div>
+
+<!-- ===== DASHBOARD ===== -->
+<div class="screen" id="screen-dash">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div>
+        <div class="topbar-suc" id="dash-suc"></div>
+        <div class="topbar-user" id="dash-user"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="topbar-role" id="dash-role"></span>
+      <button class="btn-logout" onclick="doLogout()">Salir</button>
+    </div>
+  </div>
+  <div class="dash-body">
+    <div class="tabs" id="tabs-container"></div>
+    <div id="panel-limpieza" class="panel">
+      <div class="section-title">Checklist turno tarde — Lun a Vie <span></span></div>
+      <div id="checklist-container"></div>
+    </div>
+    <div id="panel-reportes" class="panel">
+      <div class="section-title">Reportes activos <span></span></div>
+      <div id="reportes-container"></div>
+    </div>
+    <div id="panel-admin" class="panel">
+      <div class="admin-section">
+        <div class="admin-title">Usuarios de esta sucursal</div>
+        <div id="admin-users"></div>
+        <button class="add-user-btn" onclick="showToast('Disponible al conectar Firebase')">+ Agregar usuario</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL REPORTE -->
+<div class="modal-overlay" id="modal-report">
+  <div class="modal">
+    <div class="modal-title">Reportar problema</div>
+    <div class="modal-sub" id="modal-item-name"></div>
+    <textarea id="modal-desc" placeholder="Describe el problema..."></textarea>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">Prioridad</div>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <button class="btn-sm btn-atend" onclick="setPrio('normal')">Normal</button>
+      <button class="btn-sm btn-defer" onclick="setPrio('media')">Media</button>
+      <button class="btn-sm btn-prio" onclick="setPrio('alta')">Alta</button>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-send" onclick="sendReport()">Enviar reporte</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
