@@ -304,7 +304,8 @@ export const AREAS_REVISION = [
   { id: 'rev_maquinas',   nombre: 'Sala de máquinas' },
   { id: 'rev_aerobicos',  nombre: 'Sala de aeróbicos' },
   { id: 'rev_spinning',   nombre: 'Sala de spinning' },
-  { id: 'rev_recepcion',  nombre: 'Área de recepción' },
-  { id: 'rev_flotante',   nombre: 'Pisos flotantes' },
-  { id: 'rev_cardio',     nombre: 'Área de cardio' },
+  { id: 'rev_recepcion',  nombre: 'Piso gaucho' },
+  { id: 'rev_máquinas',     nombre: 'Máquinas' },
+  { id: 'rev_flotante',   nombre: 'Piso flotante' },
+  { id: 'rev_cardio',     nombre: 'Equipos de cardio' },
 ];
