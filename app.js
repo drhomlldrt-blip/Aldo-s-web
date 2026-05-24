@@ -261,9 +261,13 @@ window.toggleCheck = async function(areaId, i, val){
 // ===== REPORTES (persisten en Firebase) =====
 async function cargarReportes(){
   try {
-    const q = query(collection(db,'reportes'), where('sucursal','==',currentSuc), where('mes','==',mesActual()), orderBy('timestamp','desc'));
+    const q = query(collection(db,'reportes'), where('sucursal','==',currentSuc));
     const snap = await getDocs(q);
-    reportes = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    const mesHoy = mesActual();
+    reportes = snap.docs
+      .map(d=>({id:d.id, ...d.data()}))
+      .filter(r => r.mes === mesHoy)
+      .sort((a,b) => b.hora.localeCompare(a.hora));
   } catch(e){ reportes=[]; }
   renderReportes();
 }
