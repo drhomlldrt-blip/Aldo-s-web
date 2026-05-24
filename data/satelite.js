@@ -164,7 +164,7 @@ export const TAREAS_TARDE = [
     tareas: [
       'Limpiar máquinas del área de piso flotante',
       'Trapear piso flotante de área de máquinas',
-      'Trapear piso flotante del bar lácteo',
+      'Trapear piso flotante sector lácteo',
       'Trapear piso flotante de vestidores',
       'Trapear piso flotante de recepción (debajo de máquinas también)',
     ]
