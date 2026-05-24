@@ -9,7 +9,9 @@
 </head>
 <body>
 
-<!-- SELECCIÓN DE SUCURSAL -->
+<!-- ======================================================
+     PANTALLA 1: SELECCIÓN DE SUCURSAL
+     ====================================================== -->
 <div class="screen active" id="screen-home">
   <div class="home-inner">
     <div class="logo-area">
@@ -18,17 +20,27 @@
     </div>
     <div class="suc-label">Selecciona tu sucursal</div>
     <div class="suc-grid">
-      <div class="suc-card" onclick="selectSuc('UPEA')"><div class="suc-name">Sucursal UPEA</div></div>
-      <div class="suc-card" onclick="selectSuc('16 DE JULIO')"><div class="suc-name">Sucursal 16 de Julio</div></div>
-      <div class="suc-card" onclick="selectSuc('SATÉLITE')"><div class="suc-name">Sucursal Satélite</div></div>
-      <div class="suc-card" onclick="selectSuc('CRUCE V. ADELA')"><div class="suc-name">Sucursal Cruce V. Adela</div></div>
+      <div class="suc-card" onclick="selectSuc('SATÉLITE')">
+        <div class="suc-name">Sucursal Satélite</div>
+      </div>
+      <div class="suc-card" onclick="selectSuc('16 DE JULIO')">
+        <div class="suc-name">Sucursal 16 de Julio</div>
+      </div>
+      <div class="suc-card" onclick="selectSuc('UPEA')">
+        <div class="suc-name">Sucursal UPEA</div>
+      </div>
+      <div class="suc-card" onclick="selectSuc('CRUCE V. ADELA')">
+        <div class="suc-name">Sucursal Cruce V. Adela</div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- LOGIN -->
+<!-- ======================================================
+     PANTALLA 2: LOGIN
+     ====================================================== -->
 <div class="screen" id="screen-login">
-  <div class="login-box">
+  <div class="login-box" style="margin:auto">
     <div class="login-back" onclick="goHome()">← Volver</div>
     <div class="login-suc" id="login-suc-name"></div>
     <div class="login-title">Ingresa tus credenciales</div>
@@ -41,78 +53,146 @@
       <input type="password" id="inp-pass" placeholder="••••••••">
     </div>
     <button class="btn-primary" onclick="doLogin()">Ingresar</button>
-    <div class="login-err" id="login-err">Usuario o contraseña incorrectos</div>
+    <div class="login-err" id="login-err"></div>
   </div>
 </div>
 
-<!-- DASHBOARD -->
+<!-- ======================================================
+     PANTALLA 3: DASHBOARD
+     ====================================================== -->
 <div class="screen" id="screen-dash">
+
+  <!-- BARRA SUPERIOR -->
   <div class="topbar">
-    <div class="topbar-left">
-      <div>
-        <div class="topbar-suc" id="dash-suc"></div>
-        <div class="topbar-user" id="dash-user"></div>
-      </div>
+    <div>
+      <div class="topbar-suc" id="dash-suc"></div>
+      <div class="topbar-user" id="dash-user"></div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <span class="topbar-role" id="dash-role"></span>
       <button class="btn-logout" onclick="doLogout()">Salir</button>
     </div>
   </div>
+
   <div class="dash-body">
+
+    <!-- TABS (se construyen dinámicamente según rol) -->
     <div class="tabs" id="tabs-container"></div>
-    <div id="panel-limpieza" class="panel">
-      <div class="section-title">Checklist turno tarde — Lun a Vie <span></span></div>
+
+    <!-- PANEL: CHECKLIST DE TAREAS (limpieza y supervisor) -->
+    <div id="panel-checklist" class="panel">
       <div id="checklist-container"></div>
     </div>
+
+    <!-- PANEL: REVISIÓN DE ÁREAS (recepcionista) -->
+    <div id="panel-revision" class="panel">
+      <div class="section-title">Revisión de áreas — turno tarde <span></span></div>
+      <div id="revision-container"></div>
+    </div>
+
+    <!-- PANEL: REPORTES -->
     <div id="panel-reportes" class="panel">
+      <!-- Botón para supervisor de asignar tarea especial -->
+      <div id="btn-sup-reporte" style="display:none;margin-bottom:16px">
+        <button class="btn-asignar" onclick="abrirReporteSupervisor()">
+          + Asignar tarea especial al personal de limpieza
+        </button>
+      </div>
       <div class="section-title">Reportes activos <span></span></div>
       <div id="reportes-container"></div>
     </div>
+
+    <!-- PANEL: HISTORIAL (supervisor) -->
     <div id="panel-historial" class="panel">
-      <div class="section-title">Historial del mes <span></span></div>
-      <div id="historial-container"></div>
+      <div class="section-title">Historial del mes — checklists completados <span></span></div>
+      <div id="historial-container"><div class="empty">Cargando...</div></div>
     </div>
+
+    <!-- PANEL: ALERTAS (supervisor) -->
+    <div id="panel-alertas" class="panel">
+      <div class="section-title">Tareas sin atender en más de 24 horas <span></span></div>
+      <div id="alertas-container"><div class="empty">Sin alertas ✓</div></div>
+    </div>
+
+    <!-- PANEL: USUARIOS (supervisor) -->
     <div id="panel-admin" class="panel">
-      <div class="admin-section">
-        <div class="admin-title">Usuarios de esta sucursal</div>
-        <div id="admin-users"></div>
-        <button class="add-user-btn" onclick="showAddUserModal()">+ Agregar usuario</button>
-      </div>
+      <div class="admin-title">Usuarios de esta sucursal</div>
+      <div id="admin-users"></div>
+      <button class="add-user-btn" onclick="showAddUserModal()">+ Agregar usuario</button>
     </div>
+
   </div>
 </div>
 
-<!-- MODAL REPORTE -->
-<div class="modal-overlay" id="modal-report">
+<!-- ======================================================
+     MODAL: REPORTE DE ÁREA (recepcionista)
+     ====================================================== -->
+<div class="modal-overlay" id="modal-revision">
   <div class="modal">
-    <div class="modal-title">Reportar problema</div>
-    <div class="modal-sub" id="modal-item-name"></div>
-    <textarea id="modal-desc" placeholder="Describe el problema..."></textarea>
-    <div style="font-size:11px;color:var(--muted);margin-top:8px">Prioridad</div>
-    <div style="display:flex;gap:6px;margin-top:6px">
-      <button class="btn-sm btn-atend" id="prio-normal" onclick="setPrio('normal')">Normal</button>
-      <button class="btn-sm btn-defer" id="prio-media" onclick="setPrio('media')">Media</button>
-      <button class="btn-sm btn-prio" id="prio-alta" onclick="setPrio('alta')">Alta</button>
+    <div class="modal-title">Reportar falta de atención</div>
+    <div class="modal-sub">Área: <strong id="modal-area-nombre"></strong></div>
+    <div class="field">
+      <label>Descripción del problema</label>
+      <textarea id="modal-desc-rev" placeholder="Describe qué falta o qué está mal..."></textarea>
+    </div>
+    <div class="field">
+      <label>Prioridad</label>
+      <select id="modal-prio-rev">
+        <option value="normal">Normal</option>
+        <option value="media">Media</option>
+        <option value="alta">Alta — urgente</option>
+      </select>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeModal('modal-report')">Cancelar</button>
-      <button class="btn-send" onclick="sendReport()">Enviar reporte</button>
+      <button class="btn-cancel" onclick="closeModal('modal-revision')">Cancelar</button>
+      <button class="btn-send" onclick="enviarReporteArea()">Enviar reporte</button>
     </div>
   </div>
 </div>
 
-<!-- MODAL AGREGAR USUARIO -->
+<!-- ======================================================
+     MODAL: TAREA ESPECIAL (supervisor)
+     ====================================================== -->
+<div class="modal-overlay" id="modal-tarea-sup">
+  <div class="modal">
+    <div class="modal-title">Asignar tarea especial</div>
+    <div class="modal-sub">Esta tarea irá al personal de limpieza</div>
+    <div class="field">
+      <label>Área</label>
+      <input type="text" id="modal-task-area" placeholder="Ej: Sala de spinning">
+    </div>
+    <div class="field">
+      <label>Descripción de la tarea</label>
+      <textarea id="modal-task-desc" placeholder="Describe qué debe hacer..."></textarea>
+    </div>
+    <div class="field">
+      <label>Prioridad</label>
+      <select id="modal-task-prio">
+        <option value="normal">Normal</option>
+        <option value="media">Media</option>
+        <option value="alta">Alta — urgente</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-tarea-sup')">Cancelar</button>
+      <button class="btn-send" onclick="enviarTareaSupervisor()">Asignar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================
+     MODAL: AGREGAR USUARIO
+     ====================================================== -->
 <div class="modal-overlay" id="modal-add-user">
   <div class="modal">
     <div class="modal-title">Agregar usuario</div>
-    <div class="modal-sub">Sucursal: <span id="add-user-suc"></span></div>
+    <div class="modal-sub">Se agregará a esta sucursal</div>
     <div class="field">
       <label>Nombre completo</label>
       <input type="text" id="new-name" placeholder="Ej: María López">
     </div>
     <div class="field">
-      <label>Usuario (sin espacios)</label>
+      <label>Usuario (sin espacios, en minúsculas)</label>
       <input type="text" id="new-user" placeholder="Ej: maria.lopez">
     </div>
     <div class="field">
@@ -121,21 +201,42 @@
     </div>
     <div class="field">
       <label>Rol</label>
-      <select id="new-role" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none">
+      <select id="new-role">
         <option value="recepcionista">Recepcionista</option>
         <option value="limpieza">Limpieza</option>
       </select>
     </div>
+    <div class="field">
+      <label>Turno</label>
+      <select id="new-turno">
+        <option value="manana">Mañana</option>
+        <option value="tarde">Tarde</option>
+        <option value="noche">Noche (solo limpieza)</option>
+        <option value="apoyo">Apoyo</option>
+      </select>
+    </div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal('modal-add-user')">Cancelar</button>
-      <button class="btn-send" onclick="saveNewUser()">Guardar</button>
+      <button class="btn-send" onclick="saveNewUser()">Guardar usuario</button>
     </div>
   </div>
 </div>
 
+<!-- LOADING Y TOAST -->
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
 
 <script type="module" src="app.js"></script>
+<script>
+  // Mostrar botón especial del supervisor en panel reportes
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const obs = new MutationObserver(()=>{
+      const role = document.getElementById('dash-role')?.textContent;
+      const btn  = document.getElementById('btn-sup-reporte');
+      if(btn) btn.style.display = role==='Supervisor' ? 'block' : 'none';
+    });
+    obs.observe(document.getElementById('dash-role')||document.body,{childList:true,subtree:true});
+  });
+</script>
 </body>
 </html>

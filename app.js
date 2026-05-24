@@ -1,418 +1,656 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+// ============================================================
+// GYM CONTROL — LÓGICA PRINCIPAL
+// ============================================================
+import { db } from './firebase.js';
+import { USERS_FIJOS } from './usuarios.js';
+import { TAREAS_MANANA, TAREAS_TARDE, TAREAS_NOCHE, AREAS_REVISION, SUCURSAL_ID, SUCURSAL_NOMBRE } from './data/satelite.js';
+import {
+  collection, doc, setDoc, getDoc, getDocs,
+  updateDoc, deleteDoc, query, where, orderBy,
+  Timestamp
+} from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
-// ===== CONFIGURACIÓN FIREBASE =====
-const firebaseConfig = {
-  apiKey: "AIzaSyAXDYH2Fxc3-3k1zU-YVvFFqPpdvL4wlOY",
-  authDomain: "gym-control-40a40.firebaseapp.com",
-  projectId: "gym-control-40a40",
-  storageBucket: "gym-control-40a40.firebasestorage.app",
-  messagingSenderId: "715804426202",
-  appId: "1:715804426202:web:e73704036043427062cae3"
-};
-
-const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
-
-// ===== USUARIOS FIJOS (supervisor no cambia) =====
-const USERS_FIJOS = {
-  'admin': { pass:'gym2024', name:'Supervisor General', role:'supervisor', suc:'ALL' },
-};
-
-// ===== ÁREAS DEL CHECKLIST =====
-const AREAS = [
-  { id:'espejos', name:'Espejos y vidrios', items:[
-    'Espejos sala principal sin manchas',
-    'Espejos vestuarios limpios',
-    'Vidrios de entrada sin huellas',
-    'Espejos baños sin salpicaduras',
-  ]},
-  { id:'pisos', name:'Pisos', items:[
-    'Piso de goma (área de pesas) limpio',
-    'Piso flotante sala de aeróbicos',
-    'Piso de recepción barrido y lustrado',
-    'Pasillos sin residuos',
-  ]},
-  { id:'vestidores', name:'Vestidores', items:[
-    'Bancas limpias y secas',
-    'Casilleros sin residuos externos',
-    'Suelo del vestidor limpio',
-    'Espejos de vestidor sin manchas',
-  ]},
-  { id:'banos', name:'Baños y duchas', items:[
-    'Inodoros desinfectados',
-    'Lavabos limpios sin sarro',
-    'Duchas sin hongos ni sarro',
-    'Suelo de baños seco y limpio',
-    'Papel higiénico y jabón abastecidos',
-    'Desagüe de duchas sin obstrucción',
-  ]},
-  { id:'maquinas', name:'Máquinas y equipos', items:[
-    'Trotadoras limpias (pantalla, banda, manillas)',
-    'Spinning: asientos y manubrios desinfectados',
-    'Máquinas de pesas sin sudor',
-    'Mancuernas ordenadas y limpias',
-    'Colchonetas enrolladas y limpias',
-  ]},
-  { id:'aerobicos', name:'Sala de aeróbicos', items:[
-    'Espejo frontal de sala limpio',
-    'Piso de sala barrido',
-    'Ventiladores y aires sin polvo',
-    'Equipo de sonido externo limpio',
-  ]},
-  { id:'recepcion', name:'Área de recepción', items:[
-    'Mostrador limpio y ordenado',
-    'Sillas de espera limpias',
-    'Entrada y alfombra de bienvenida limpia',
-    'Papeleras vaciadas',
-  ]},
-];
-
-// ===== ESTADO =====
+// ============================================================
+// ESTADO GLOBAL
+// ============================================================
 let currentSuc  = '';
 let currentUser = null;
-let reportPrio  = 'normal';
-let reportItem  = '';
-let checkState  = {};
 let reportes    = [];
 let usuarios    = [];
 
-// ===== HELPERS =====
+// ============================================================
+// HELPERS DE FECHA Y TIEMPO
+// ============================================================
+function fechaHoy(){
+  return new Date().toISOString().split('T')[0];
+}
+function mesActual(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function horaActual(){
+  return new Date().toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit'});
+}
+function timestampAhora(){
+  return Date.now();
+}
+function detectarTurnoLimpieza(){
+  const h = new Date().getHours();
+  if(h >= 7  && h < 14) return 'manana';
+  if(h >= 14 && h < 18) return 'tarde';
+  if(h >= 18 && h < 23) return 'noche';
+  return currentUser?.turno || 'manana';
+}
+function turnoLabel(t){
+  return { manana:'Turno mañana', tarde:'Turno tarde', noche:'Turno noche', apoyo:'Turno apoyo' }[t] || t;
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
 function showLoading(){ document.getElementById('loading').classList.add('show'); }
 function hideLoading(){ document.getElementById('loading').classList.remove('show'); }
-function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
-function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-window.closeModal = closeModal;
+function showToast(msg, tipo='ok'){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + tipo;
+  setTimeout(()=>t.classList.remove('show'), 3000);
+}
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+window.closeModal = (id) => document.getElementById(id).classList.remove('open');
 
-function fechaHoy(){ return new Date().toISOString().split('T')[0]; }
-function mesActual(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
-
-// ===== NAVEGACIÓN =====
+// ============================================================
+// PANTALLA HOME — SELECCIÓN DE SUCURSAL
+// ============================================================
 window.selectSuc = function(suc){
   currentSuc = suc;
-  document.getElementById('login-suc-name').textContent = 'Sucursal ' + suc;
+  document.getElementById('login-suc-name').textContent = suc;
   document.getElementById('inp-user').value = '';
   document.getElementById('inp-pass').value = '';
   document.getElementById('login-err').style.display = 'none';
   show('screen-login');
-  setTimeout(()=>document.getElementById('inp-user').focus(), 300);
+  setTimeout(()=>document.getElementById('inp-user').focus(), 200);
 };
+window.goHome = () => show('screen-home');
 
-window.goHome = function(){ show('screen-home'); };
-
-// ===== LOGIN =====
+// ============================================================
+// LOGIN
+// ============================================================
 window.doLogin = async function(){
   const u   = document.getElementById('inp-user').value.trim().toLowerCase();
   const p   = document.getElementById('inp-pass').value;
   const err = document.getElementById('login-err');
-
+  err.style.display = 'none';
   showLoading();
 
-  // Verificar usuario fijo (admin)
+  // Supervisor fijo
   if(USERS_FIJOS[u]){
     const user = USERS_FIJOS[u];
-    if(user.pass !== p){ hideLoading(); err.textContent='Usuario o contraseña incorrectos'; err.style.display='block'; return; }
+    if(user.pass !== p){ hideLoading(); err.textContent='Contraseña incorrecta'; err.style.display='block'; return; }
     currentUser = {...user, username:u};
-    await loadDash();
-    return;
+    await loadDash(); return;
   }
 
-  // Verificar usuario en Firebase
+  // Usuario en Firebase
   try {
-    const docRef = doc(db, 'usuarios', u);
-    const docSnap = await getDoc(docRef);
-    if(!docSnap.exists()){ hideLoading(); err.textContent='Usuario o contraseña incorrectos'; err.style.display='block'; return; }
-    const user = docSnap.data();
-    if(user.pass !== p){ hideLoading(); err.textContent='Usuario o contraseña incorrectos'; err.style.display='block'; return; }
+    const snap = await getDoc(doc(db,'usuarios',u));
+    if(!snap.exists()){ hideLoading(); err.textContent='Usuario no encontrado'; err.style.display='block'; return; }
+    const user = snap.data();
+    if(user.pass !== p){ hideLoading(); err.textContent='Contraseña incorrecta'; err.style.display='block'; return; }
     if(user.suc !== currentSuc){ hideLoading(); err.textContent='No tienes acceso a esta sucursal'; err.style.display='block'; return; }
     currentUser = {...user, username:u};
     await loadDash();
   } catch(e){
-    hideLoading(); err.textContent='Error de conexión. Intenta de nuevo.'; err.style.display='block';
+    hideLoading(); err.textContent='Error de conexión'; err.style.display='block';
   }
 };
+window.doLogout = function(){ currentUser=null; reportes=[]; usuarios=[]; goHome(); };
+document.getElementById('inp-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 
-window.doLogout = function(){ currentUser=null; checkState={}; reportes=[]; usuarios=[]; goHome(); };
-
-// ===== DASHBOARD =====
+// ============================================================
+// DASHBOARD
+// ============================================================
 async function loadDash(){
-  document.getElementById('dash-suc').textContent  = 'Sucursal ' + currentSuc;
+  document.getElementById('dash-suc').textContent  = currentSuc;
   document.getElementById('dash-user').textContent = currentUser.name;
-  const roleLabels = { supervisor:'Supervisor', recepcionista:'Recepcionista', limpieza:'Limpieza' };
-  document.getElementById('dash-role').textContent = roleLabels[currentUser.role];
+  document.getElementById('dash-role').textContent = {
+    supervisor:'Supervisor', recepcionista:'Recepcionista', limpieza:'Limpieza'
+  }[currentUser.role] || currentUser.role;
 
+  // Definir tabs según rol
   let tabs = [];
   if(currentUser.role === 'supervisor'){
     tabs = [
-      {id:'panel-limpieza', label:'Checklist'},
-      {id:'panel-reportes', label:'Reportes'},
-      {id:'panel-historial', label:'Historial'},
-      {id:'panel-admin', label:'Usuarios'},
+      {id:'panel-checklist',  label:'Checklist limpieza'},
+      {id:'panel-reportes',   label:'Reportes'},
+      {id:'panel-historial',  label:'Historial'},
+      {id:'panel-alertas',    label:'Alertas'},
+      {id:'panel-admin',      label:'Usuarios'},
     ];
   } else if(currentUser.role === 'recepcionista'){
     tabs = [
-      {id:'panel-limpieza', label:'Checklist'},
-      {id:'panel-reportes', label:'Reportes'},
+      {id:'panel-revision',   label:'Revisión áreas'},
+      {id:'panel-reportes',   label:'Mis reportes'},
     ];
   } else if(currentUser.role === 'limpieza'){
     tabs = [
-      {id:'panel-reportes', label:'Mis tareas'},
+      {id:'panel-checklist',  label:'Mis tareas'},
+      {id:'panel-reportes',   label:'Reportes a atender'},
     ];
   }
 
-  ['panel-limpieza','panel-reportes','panel-historial','panel-admin'].forEach(p=>document.getElementById(p).classList.remove('active'));
-
+  // Construir tabs
+  const allPanels = ['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin'];
+  allPanels.forEach(p=>document.getElementById(p).classList.remove('active'));
   const tabsEl = document.getElementById('tabs-container');
   tabsEl.innerHTML = '';
   tabs.forEach((t,i)=>{
     const el = document.createElement('div');
     el.className = 'tab'+(i===0?' active':'');
     el.textContent = t.label;
+    el.dataset.panel = t.id;
     el.onclick = ()=>{
       document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
       el.classList.add('active');
-      ['panel-limpieza','panel-reportes','panel-historial','panel-admin'].forEach(p=>document.getElementById(p).classList.remove('active'));
+      allPanels.forEach(p=>document.getElementById(p).classList.remove('active'));
       document.getElementById(t.id).classList.add('active');
+      if(t.id==='panel-historial') cargarHistorial();
+      if(t.id==='panel-alertas')   cargarAlertas();
+      if(t.id==='panel-admin')     cargarUsuarios();
     };
     tabsEl.appendChild(el);
   });
-
   if(tabs.length) document.getElementById(tabs[0].id).classList.add('active');
 
   await Promise.all([
-    cargarChecklist(),
+    renderChecklist(),
     cargarReportes(),
-    cargarUsuarios(),
   ]);
-
+  if(currentUser.role==='supervisor') await cargarAlertas();
+  if(currentUser.role==='recepcionista') renderRevision();
   hideLoading();
   show('screen-dash');
 }
 
-// ===== CHECKLIST (persiste por sucursal + día) =====
-async function cargarChecklist(){
-  const docId = `${currentSuc}_${fechaHoy()}`;
-  try {
-    const docSnap = await getDoc(doc(db, 'checklists', docId));
-    checkState = docSnap.exists() ? docSnap.data().estado || {} : {};
-  } catch(e){ checkState = {}; }
-  renderChecklist();
+// ============================================================
+// CHECKLIST DE TAREAS DIARIAS (personal de limpieza)
+// ============================================================
+function getTareasPorTurno(){
+  const turno = currentUser.turno || detectarTurnoLimpieza();
+  if(turno==='manana') return { lista: TAREAS_MANANA, turno:'manana' };
+  if(turno==='tarde')  return { lista: TAREAS_TARDE,  turno:'tarde'  };
+  if(turno==='noche')  return { lista: TAREAS_NOCHE,  turno:'noche'  };
+  return { lista: TAREAS_MANANA, turno:'manana' };
 }
 
-async function guardarChecklist(){
-  const docId = `${currentSuc}_${fechaHoy()}`;
-  await setDoc(doc(db, 'checklists', docId), {
-    sucursal: currentSuc,
-    fecha: fechaHoy(),
-    mes: mesActual(),
-    estado: checkState,
-    ultimaActualizacion: new Date().toISOString(),
-    actualizadoPor: currentUser.name,
-  });
-}
-
-function renderChecklist(){
+async function renderChecklist(){
   const cont = document.getElementById('checklist-container');
-  cont.innerHTML = '';
-  AREAS.forEach(area=>{
-    const estado = checkState[area.id] || [];
-    const done = estado.filter(Boolean).length;
-    const total = area.items.length;
-    const badgeCls = done===total?'badge-ok':done>0?'badge-pend':'badge-crit';
-    const badgeTxt = done===total?'Completo':`${done}/${total}`;
-    const block = document.createElement('div');
-    block.className = 'area-block';
-    block.innerHTML = `
-      <div class="area-header" onclick="toggleArea('${area.id}')">
-        <span class="area-name">${area.name}</span>
-        <span class="area-badge ${badgeCls}">${badgeTxt}</span>
-        <span class="chevron" id="chev-${area.id}">▼</span>
+  if(!cont) return;
+
+  const { lista, turno } = getTareasPorTurno();
+  const docId = `${currentSuc}_${turno}_${fechaHoy()}`;
+
+  // Cargar estado guardado
+  let estado = {};
+  try {
+    const snap = await getDoc(doc(db,'checklists',docId));
+    if(snap.exists()) estado = snap.data().tareas || {};
+  } catch(e){}
+
+  // Título del turno
+  const turnoInfo = {
+    manana: 'Turno mañana — 07:00 a 11:00',
+    tarde:  'Turno tarde — 14:30 a 18:30',
+    noche:  'Turno noche — 18:30 a 22:30',
+  };
+
+  let html = `<div class="section-title">${turnoInfo[turno] || ''} <span></span></div>`;
+
+  lista.forEach(bloque => {
+    const hechas = bloque.tareas.filter((_,i)=>estado[`${bloque.id}_${i}`]?.hecho).length;
+    const total  = bloque.tareas.length;
+    const pct    = Math.round(hechas/total*100);
+    const badgeCls = hechas===total?'badge-ok':hechas>0?'badge-pend':'badge-crit';
+
+    html += `
+    <div class="area-block">
+      <div class="area-header" onclick="toggleBloque('${bloque.id}')">
+        <div>
+          <div class="area-name">${bloque.area}</div>
+          <div class="area-hora">${bloque.hora}</div>
+        </div>
+        <span class="area-badge ${badgeCls}">${hechas}/${total}</span>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <span class="chevron" id="chev-${bloque.id}">▼</span>
       </div>
-      <div class="area-items" id="items-${area.id}">
-        ${area.items.map((item,i)=>`
-          <div class="check-item">
-            <input type="checkbox" ${estado[i]?'checked':''} onchange="toggleCheck('${area.id}',${i},this.checked)">
-            <div>
-              <div class="check-label ${estado[i]?'done':''}">${item}</div>
-              ${currentUser.role!=='limpieza'?`<button class="btn-report" onclick="openReport('${item}','${area.name}')">Reportar problema</button>`:''}
+      <div class="area-items" id="items-${bloque.id}">
+        ${bloque.tareas.map((tarea,i)=>{
+          const key   = `${bloque.id}_${i}`;
+          const dat   = estado[key] || {};
+          const hecho = dat.hecho || false;
+          const hora  = dat.hora  || '';
+          const quien = dat.quien || '';
+          return `
+          <div class="check-item ${hecho?'item-done':''}">
+            <input type="checkbox" ${hecho?'checked':''} 
+              onchange="marcarTarea('${bloque.id}',${i},this.checked,'${docId}')">
+            <div class="check-content">
+              <div class="check-label ${hecho?'done':''}">${tarea}</div>
+              ${hecho?`<div class="check-meta">Hecho a las ${hora} por ${quien}</div>`:''}
             </div>
-          </div>`).join('')}
-      </div>`;
-    cont.appendChild(block);
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
   });
+
+  cont.innerHTML = html;
 }
 
-window.toggleArea = function(id){
-  const el=document.getElementById('items-'+id); const chev=document.getElementById('chev-'+id);
-  el.classList.toggle('open'); chev.textContent=el.classList.contains('open')?'▲':'▼';
+window.toggleBloque = function(id){
+  const el   = document.getElementById('items-'+id);
+  const chev = document.getElementById('chev-'+id);
+  if(!el) return;
+  el.classList.toggle('open');
+  chev.textContent = el.classList.contains('open')?'▲':'▼';
 };
 
-window.toggleCheck = async function(areaId, i, val){
-  if(!checkState[areaId]) checkState[areaId]=[];
-  checkState[areaId][i] = val;
-  renderChecklist();
-  const el=document.getElementById('items-'+areaId);
-  if(el){ el.classList.add('open'); document.getElementById('chev-'+areaId).textContent='▲'; }
-  await guardarChecklist();
-  showToast(val ? 'Ítem completado ✓' : 'Ítem desmarcado');
+window.marcarTarea = async function(bloqueId, i, hecho, docId){
+  const key = `${bloqueId}_${i}`;
+  showLoading();
+  try {
+    const snap = await getDoc(doc(db,'checklists',docId));
+    const data = snap.exists() ? snap.data() : {};
+    const tareas = data.tareas || {};
+
+    if(hecho){
+      tareas[key] = {
+        hecho: true,
+        hora:  horaActual(),
+        quien: currentUser.name,
+        timestamp: timestampAhora(),
+      };
+    } else {
+      delete tareas[key];
+    }
+
+    await setDoc(doc(db,'checklists',docId),{
+      sucursal: currentSuc,
+      turno: currentUser.turno || detectarTurnoLimpieza(),
+      fecha: fechaHoy(),
+      mes: mesActual(),
+      tareas,
+      actualizadoPor: currentUser.name,
+      actualizadoEn: new Date().toISOString(),
+    });
+
+    await renderChecklist();
+    // Mantener abierto el bloque que se editó
+    const el = document.getElementById('items-'+bloqueId);
+    if(el){ el.classList.add('open'); document.getElementById('chev-'+bloqueId).textContent='▲'; }
+    showToast(hecho?'Tarea marcada como hecha ✓':'Tarea desmarcada');
+  } catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
 };
 
-// ===== REPORTES (persisten en Firebase) =====
+// ============================================================
+// REVISIÓN DE ÁREAS — RECEPCIONISTA
+// ============================================================
+function renderRevision(){
+  const cont = document.getElementById('revision-container');
+  if(!cont) return;
+  cont.innerHTML = AREAS_REVISION.map(area=>`
+    <div class="area-block">
+      <div class="area-header-rev">
+        <div class="area-name">${area.nombre}</div>
+        <div class="rev-btns">
+          <button class="btn-rev btn-bien"    onclick="reportarArea('${area.id}','${area.nombre}','bien')">Bien</button>
+          <button class="btn-rev btn-falta"   onclick="abrirReporteArea('${area.id}','${area.nombre}')">Falta atención</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+let reporteAreaActual = null;
+window.abrirReporteArea = function(areaId, areaNombre){
+  reporteAreaActual = { id: areaId, nombre: areaNombre };
+  document.getElementById('modal-area-nombre').textContent = areaNombre;
+  document.getElementById('modal-desc-rev').value = '';
+  document.getElementById('modal-prio-rev').value = 'normal';
+  document.getElementById('modal-revision').classList.add('open');
+};
+
+window.reportarArea = async function(areaId, areaNombre, estado){
+  showLoading();
+  try {
+    await setDoc(doc(collection(db,'reportes')),{
+      areaId, area: areaNombre,
+      estado: 'pendiente',
+      nivelRevision: estado,
+      desc: estado==='bien'?'Área en buen estado':'',
+      sucursal: currentSuc,
+      fecha: fechaHoy(),
+      mes: mesActual(),
+      creadoPor: currentUser.name,
+      rol: 'recepcionista',
+      timestamp: timestampAhora(),
+      expiraEn: null,
+    });
+    showToast(estado==='bien'?`${areaNombre} — marcada como bien`:`${areaNombre} — reporte enviado`);
+    await cargarReportes();
+  } catch(e){ showToast('Error al enviar','err'); }
+  hideLoading();
+};
+
+window.enviarReporteArea = async function(){
+  if(!reporteAreaActual) return;
+  const desc = document.getElementById('modal-desc-rev').value.trim();
+  const prio = document.getElementById('modal-prio-rev').value;
+  showLoading();
+  try {
+    await setDoc(doc(collection(db,'reportes')),{
+      areaId: reporteAreaActual.id,
+      area: reporteAreaActual.nombre,
+      estado: 'pendiente',
+      nivelRevision: 'falta',
+      prio,
+      desc: desc || 'Requiere atención',
+      sucursal: currentSuc,
+      fecha: fechaHoy(),
+      mes: mesActual(),
+      creadoPor: currentUser.name,
+      rol: 'recepcionista',
+      timestamp: timestampAhora(),
+      expiraEn: null,
+      alertaEn: timestampAhora() + (24*60*60*1000), // 24 horas
+    });
+    closeModal('modal-revision');
+    showToast('Reporte enviado al personal de limpieza');
+    await cargarReportes();
+  } catch(e){ showToast('Error al enviar','err'); }
+  hideLoading();
+};
+
+// Supervisor también puede crear reportes/tareas especiales
+window.abrirReporteSupervisor = function(){
+  document.getElementById('modal-task-desc').value = '';
+  document.getElementById('modal-task-area').value = '';
+  document.getElementById('modal-task-prio').value = 'normal';
+  document.getElementById('modal-tarea-sup').classList.add('open');
+};
+
+window.enviarTareaSupervisor = async function(){
+  const desc = document.getElementById('modal-task-desc').value.trim();
+  const area = document.getElementById('modal-task-area').value.trim();
+  const prio = document.getElementById('modal-task-prio').value;
+  if(!desc){ showToast('Escribe la descripción','err'); return; }
+  showLoading();
+  try {
+    await setDoc(doc(collection(db,'reportes')),{
+      area: area || 'General',
+      estado: 'pendiente',
+      nivelRevision: 'supervisor',
+      prio,
+      desc,
+      sucursal: currentSuc,
+      fecha: fechaHoy(),
+      mes: mesActual(),
+      creadoPor: currentUser.name,
+      rol: 'supervisor',
+      timestamp: timestampAhora(),
+      expiraEn: null,
+      alertaEn: timestampAhora() + (24*60*60*1000),
+    });
+    closeModal('modal-tarea-sup');
+    showToast('Tarea asignada al personal de limpieza');
+    await cargarReportes();
+  } catch(e){ showToast('Error al enviar','err'); }
+  hideLoading();
+};
+
+// ============================================================
+// REPORTES
+// ============================================================
 async function cargarReportes(){
   try {
     const q = query(collection(db,'reportes'), where('sucursal','==',currentSuc));
     const snap = await getDocs(q);
-    const mesHoy = mesActual();
+    const ahora = timestampAhora();
+
+    // Filtrar: excluir atendidos con más de 48h
     reportes = snap.docs
-      .map(d=>({id:d.id, ...d.data()}))
-      .filter(r => r.mes === mesHoy)
-      .sort((a,b) => b.hora.localeCompare(a.hora));
+      .map(d=>({id:d.id,...d.data()}))
+      .filter(r=>{
+        if(r.estado==='atendido' && r.expiraEn && ahora > r.expiraEn) return false;
+        return true;
+      })
+      .sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
   } catch(e){ reportes=[]; }
   renderReportes();
 }
 
-window.openReport = function(item, area){
-  reportItem = `${area} — ${item}`;
-  reportPrio = 'normal';
-  document.getElementById('modal-item-name').textContent = reportItem;
-  document.getElementById('modal-desc').value = '';
-  document.getElementById('modal-report').classList.add('open');
-};
-
-window.setPrio = function(p){
-  reportPrio = p;
-  ['normal','media','alta'].forEach(x=>{ document.getElementById('prio-'+x).style.opacity = x===p?'1':'0.5'; });
-};
-
-window.sendReport = async function(){
-  const desc = document.getElementById('modal-desc').value.trim();
-  const now  = new Date();
-  showLoading();
-  try {
-    const newReport = {
-      item: reportItem,
-      desc: desc || 'Sin descripción adicional',
-      prio: reportPrio,
-      estado: reportPrio==='alta'?'prioridad':'pendiente',
-      hora: now.toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit'}),
-      fecha: fechaHoy(),
-      mes: mesActual(),
-      sucursal: currentSuc,
-      creadoPor: currentUser.name,
-      timestamp: Timestamp.fromDate(now),
-    };
-    const ref = doc(collection(db,'reportes'));
-    await setDoc(ref, newReport);
-    closeModal('modal-report');
-    await cargarReportes();
-    showToast('Reporte enviado correctamente');
-  } catch(e){ showToast('Error al enviar reporte'); }
-  hideLoading();
-};
-
 function renderReportes(){
   const cont = document.getElementById('reportes-container');
-  if(!reportes.length){ cont.innerHTML='<div class="empty">Sin reportes activos este mes</div>'; return; }
-  const estadoMap   = {pendiente:'s-pend',atendido:'s-done',prioridad:'s-prio',diferido:'s-def'};
-  const estadoLabel = {pendiente:'Pendiente',atendido:'Atendido ✓',prioridad:'Prioritario',diferido:'Diferido'};
-  const canAct = currentUser.role==='limpieza'||currentUser.role==='supervisor';
-  cont.innerHTML = reportes.map(r=>`
-    <div class="report-card">
+  if(!cont) return;
+
+  // Filtrar según rol
+  let lista = reportes;
+  if(currentUser.role === 'recepcionista'){
+    // Recepcionista ve sus reportes y puede ver si fueron atendidos
+    lista = reportes.filter(r=>r.nivelRevision!=='bien');
+  } else if(currentUser.role === 'limpieza'){
+    // Limpieza solo ve pendientes y en alerta
+    lista = reportes.filter(r=>r.estado!=='atendido' && r.nivelRevision!=='bien');
+  }
+
+  if(!lista.length){
+    cont.innerHTML = '<div class="empty">Sin reportes activos</div>';
+    return;
+  }
+
+  const ahora = timestampAhora();
+  const estadoMap   = {pendiente:'s-pend',atendido:'s-done',alerta:'s-alerta'};
+  const estadoLabel = {pendiente:'Pendiente',atendido:'Atendido ✓',alerta:'⚠ Sin atender'};
+  const prioMap     = {alta:'prio-alta',media:'prio-media',normal:''};
+
+  cont.innerHTML = lista.map(r=>{
+    // Detectar si pasó a alerta (24h sin atender)
+    const enAlerta = r.estado==='pendiente' && r.alertaEn && ahora > r.alertaEn;
+    const estadoReal = enAlerta ? 'alerta' : r.estado;
+    const canAtender = currentUser.role==='limpieza' || currentUser.role==='supervisor';
+    const canPrio    = currentUser.role==='supervisor';
+
+    return `
+    <div class="report-card ${prioMap[r.prio]||''} ${enAlerta?'en-alerta':''}">
       <div class="report-top">
-        <div class="report-area">${r.item}</div>
-        <span class="status-pill ${estadoMap[r.estado]}">${estadoLabel[r.estado]}</span>
+        <div>
+          <div class="report-area">${r.area}</div>
+          <div class="report-fecha">${r.fecha} · ${r.creadoPor}</div>
+        </div>
+        <span class="status-pill ${estadoMap[estadoReal]}">${estadoLabel[estadoReal]}</span>
       </div>
-      <div class="report-desc">${r.desc} <span style="font-size:10px"> · ${r.hora} · ${r.fecha} · por ${r.creadoPor}</span></div>
-      ${canAct&&r.estado!=='atendido'?`<div class="report-actions">
-        <button class="btn-sm btn-atend" onclick="actReport('${r.id}','atendido')">✓ Atendido</button>
-        ${currentUser.role==='supervisor'?`
-        <button class="btn-sm btn-prio" onclick="actReport('${r.id}','prioridad')">Prioridad</button>
-        <button class="btn-sm btn-defer" onclick="actReport('${r.id}','diferido')">Diferir</button>`:''}
-      </div>`:''}
-    </div>`).join('');
+      ${r.desc?`<div class="report-desc">${r.desc}</div>`:''}
+      ${enAlerta?`<div class="alerta-msg">⚠ No fue atendido en 24 horas</div>`:''}
+      <div class="report-actions">
+        ${canAtender && r.estado!=='atendido' ? `
+          <button class="btn-sm btn-atend" onclick="atenderReporte('${r.id}')">✓ Marcar atendido</button>`:''}
+        ${canPrio && r.estado!=='atendido' ? `
+          <button class="btn-sm btn-prio" onclick="cambiarPrio('${r.id}','alta')">🔴 Prioridad</button>
+          <button class="btn-sm btn-defer" onclick="cambiarPrio('${r.id}','diferido')">Diferir</button>`:''}
+        ${currentUser.role==='recepcionista' && r.estado!=='atendido' && !enAlerta?`
+          <button class="btn-sm btn-noatend" onclick="reportarNoAtendido('${r.id}')">No fue atendido</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
 }
 
-window.actReport = async function(id, estado){
+window.atenderReporte = async function(id){
   showLoading();
   try {
-    await updateDoc(doc(db,'reportes',id),{ estado, actualizadoPor: currentUser.name, actualizadoEn: new Date().toISOString() });
+    const expira = timestampAhora() + (48*60*60*1000); // 48h para desaparecer
+    await updateDoc(doc(db,'reportes',id),{
+      estado: 'atendido',
+      atendidoPor: currentUser.name,
+      atendidoEn: horaActual(),
+      atendidoFecha: fechaHoy(),
+      expiraEn: expira,
+    });
     await cargarReportes();
-    const msgs={atendido:'Marcado como atendido',prioridad:'Marcado como prioritario',diferido:'Diferido al siguiente turno'};
-    showToast(msgs[estado]);
-  } catch(e){ showToast('Error al actualizar'); }
+    showToast('Marcado como atendido ✓');
+  } catch(e){ showToast('Error','err'); }
   hideLoading();
 };
 
-// ===== HISTORIAL =====
-async function cargarHistorial(){
+window.cambiarPrio = async function(id, val){
+  showLoading();
   try {
-    const q = query(collection(db,'reportes'), where('sucursal','==',currentSuc), where('mes','==',mesActual()), orderBy('timestamp','desc'));
+    await updateDoc(doc(db,'reportes',id),{ prio: val, editadoPor: currentUser.name });
+    await cargarReportes();
+    showToast('Prioridad actualizada');
+  } catch(e){ showToast('Error','err'); }
+  hideLoading();
+};
+
+window.reportarNoAtendido = async function(id){
+  showLoading();
+  try {
+    await updateDoc(doc(db,'reportes',id),{
+      estado: 'alerta',
+      noAtendidoReportadoPor: currentUser.name,
+      noAtendidoEn: horaActual(),
+    });
+    await cargarReportes();
+    showToast('Reportado como no atendido — el supervisor fue notificado');
+  } catch(e){ showToast('Error','err'); }
+  hideLoading();
+};
+
+// ============================================================
+// HISTORIAL (solo supervisor)
+// ============================================================
+async function cargarHistorial(){
+  const cont = document.getElementById('historial-container');
+  if(!cont) return;
+  showLoading();
+  try {
+    // Historial de checklists del mes
+    const q = query(collection(db,'checklists'), where('sucursal','==',currentSuc), where('mes','==',mesActual()));
     const snap = await getDocs(q);
-    const todos = snap.docs.map(d=>d.data());
-    const cont = document.getElementById('historial-container');
-    if(!todos.length){ cont.innerHTML='<div class="empty">Sin historial este mes</div>'; return; }
-    cont.innerHTML = todos.map(r=>`
-      <div class="hist-card">
-        <div class="hist-date">${r.fecha} · ${r.hora} · ${r.sucursal}</div>
-        <div class="hist-item">${r.item}</div>
-        <div class="hist-detail">Estado: ${r.estado} · Por: ${r.creadoPor}</div>
-      </div>`).join('');
-  } catch(e){ document.getElementById('historial-container').innerHTML='<div class="empty">Error al cargar historial</div>'; }
+    const docs = snap.docs.map(d=>d.data()).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+
+    if(!docs.length){ cont.innerHTML='<div class="empty">Sin historial este mes</div>'; hideLoading(); return; }
+
+    let html = '';
+    docs.forEach(d=>{
+      const tareas = d.tareas || {};
+      const hechas = Object.values(tareas).filter(t=>t.hecho);
+      if(!hechas.length) return;
+      html += `<div class="hist-card">
+        <div class="hist-fecha">${d.fecha} · ${turnoLabel(d.turno)} · ${d.actualizadoPor}</div>
+        <div class="hist-tareas">
+          ${hechas.map(t=>`<div class="hist-tarea">✓ Hecha a las ${t.hora} por ${t.quien}</div>`).join('')}
+        </div>
+      </div>`;
+    });
+    cont.innerHTML = html || '<div class="empty">Sin actividad registrada</div>';
+  } catch(e){ cont.innerHTML='<div class="empty">Error al cargar historial</div>'; }
+  hideLoading();
 }
 
-// ===== USUARIOS (Firebase) =====
+// ============================================================
+// ALERTAS (solo supervisor)
+// ============================================================
+async function cargarAlertas(){
+  const cont = document.getElementById('alertas-container');
+  if(!cont) return;
+  const ahora = timestampAhora();
+  const alertas = reportes.filter(r=>
+    (r.estado==='alerta') ||
+    (r.estado==='pendiente' && r.alertaEn && ahora > r.alertaEn)
+  );
+
+  // Badge en tab
+  const tabAlertas = document.querySelector('[data-panel="panel-alertas"]');
+  if(tabAlertas){
+    tabAlertas.textContent = alertas.length > 0 ? `Alertas (${alertas.length})` : 'Alertas';
+    tabAlertas.style.background = alertas.length > 0 ? '#e84a4a' : '';
+    tabAlertas.style.color = alertas.length > 0 ? '#fff' : '';
+  }
+
+  if(!alertas.length){
+    cont.innerHTML='<div class="empty">Sin alertas activas ✓</div>';
+    return;
+  }
+
+  cont.innerHTML = `
+    <div class="alerta-banner">⚠ ${alertas.length} tarea${alertas.length>1?'s':''} sin atender en más de 24 horas</div>
+    ${alertas.map(r=>`
+    <div class="report-card en-alerta">
+      <div class="report-top">
+        <div>
+          <div class="report-area">${r.area}</div>
+          <div class="report-fecha">${r.fecha} · Reportado por: ${r.creadoPor}</div>
+        </div>
+        <span class="status-pill s-alerta">Sin atender</span>
+      </div>
+      ${r.desc?`<div class="report-desc">${r.desc}</div>`:''}
+      <div class="report-actions">
+        <button class="btn-sm btn-prio" onclick="cambiarPrio('${r.id}','alta')">🔴 Marcar urgente</button>
+        <button class="btn-sm btn-atend" onclick="atenderReporte('${r.id}')">✓ Atendido</button>
+      </div>
+    </div>`).join('')}`;
+}
+
+// ============================================================
+// ADMIN — GESTIÓN DE USUARIOS
+// ============================================================
 async function cargarUsuarios(){
+  const cont = document.getElementById('admin-users');
+  if(!cont) return;
   try {
     const q = query(collection(db,'usuarios'), where('suc','==',currentSuc));
     const snap = await getDocs(q);
     usuarios = snap.docs.map(d=>({id:d.id,...d.data()}));
   } catch(e){ usuarios=[]; }
-  renderAdmin();
-}
 
-function renderAdmin(){
-  const cont = document.getElementById('admin-users');
-  document.getElementById('add-user-suc').textContent = currentSuc;
   const roleColor={supervisor:'color:#e8c14a',recepcionista:'color:#4ae8a0',limpieza:'color:#e8904a'};
-
-  // Usuario fijo admin
   let html = `<div class="user-row">
-    <div class="user-info"><div class="user-name">Supervisor General</div><div class="user-detail">@admin · <span style="color:#e8c14a">supervisor</span></div></div>
+    <div class="user-info"><div class="user-name">Supervisor General</div>
+    <div class="user-detail">@admin · <span style="color:#e8c14a">supervisor</span></div></div>
   </div>`;
-
   html += usuarios.map(u=>`
     <div class="user-row">
       <div class="user-info">
         <div class="user-name">${u.name}</div>
-        <div class="user-detail">@${u.id} · <span style="${roleColor[u.role]}">${u.role}</span></div>
+        <div class="user-detail">@${u.id} · <span style="${roleColor[u.role]||''}">${u.role}</span> · ${turnoLabel(u.turno)}</div>
       </div>
       <button class="btn-del" onclick="eliminarUsuario('${u.id}')">Dar de baja</button>
     </div>`).join('');
-
   cont.innerHTML = html;
 }
 
 window.showAddUserModal = function(){
-  document.getElementById('new-name').value='';
-  document.getElementById('new-user').value='';
-  document.getElementById('new-pass').value='';
+  ['new-name','new-user','new-pass'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('modal-add-user').classList.add('open');
 };
 
 window.saveNewUser = async function(){
-  const name = document.getElementById('new-name').value.trim();
-  const user = document.getElementById('new-user').value.trim().toLowerCase();
-  const pass = document.getElementById('new-pass').value;
-  const role = document.getElementById('new-role').value;
-  if(!name||!user||!pass){ showToast('Completa todos los campos'); return; }
+  const name  = document.getElementById('new-name').value.trim();
+  const user  = document.getElementById('new-user').value.trim().toLowerCase();
+  const pass  = document.getElementById('new-pass').value;
+  const role  = document.getElementById('new-role').value;
+  const turno = document.getElementById('new-turno').value;
+  if(!name||!user||!pass){ showToast('Completa todos los campos','err'); return; }
   showLoading();
   try {
-    await setDoc(doc(db,'usuarios',user),{ name, pass, role, suc:currentSuc, creadoEn: new Date().toISOString() });
+    await setDoc(doc(db,'usuarios',user),{ name, pass, role, turno, suc:currentSuc, creadoEn:new Date().toISOString() });
     closeModal('modal-add-user');
     await cargarUsuarios();
     showToast('Usuario agregado correctamente');
-  } catch(e){ showToast('Error al guardar usuario'); }
+  } catch(e){ showToast('Error al guardar','err'); }
   hideLoading();
 };
 
@@ -423,14 +661,6 @@ window.eliminarUsuario = async function(id){
     await deleteDoc(doc(db,'usuarios',id));
     await cargarUsuarios();
     showToast('Usuario dado de baja');
-  } catch(e){ showToast('Error al eliminar usuario'); }
+  } catch(e){ showToast('Error','err'); }
   hideLoading();
 };
-
-// Enter en login
-document.getElementById('inp-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
-
-// Cargar historial al cambiar de tab
-document.addEventListener('click', e=>{
-  if(e.target.classList.contains('tab') && e.target.textContent==='Historial') cargarHistorial();
-});
