@@ -9,7 +9,7 @@
 </head>
 <body>
 
-<!-- ===== SELECCIÓN DE SUCURSAL ===== -->
+<!-- SELECCIÓN DE SUCURSAL -->
 <div class="screen active" id="screen-home">
   <div class="home-inner">
     <div class="logo-area">
@@ -18,23 +18,15 @@
     </div>
     <div class="suc-label">Selecciona tu sucursal</div>
     <div class="suc-grid">
-      <div class="suc-card" onclick="selectSuc('UPEA')">
-        <div class="suc-name">Sucursal UPEA</div>
-      </div>
-      <div class="suc-card" onclick="selectSuc('16 DE JULIO')">
-        <div class="suc-name">Sucursal 16 de Julio</div>
-      </div>
-      <div class="suc-card" onclick="selectSuc('SATÉLITE')">
-        <div class="suc-name">Sucursal Satélite</div>
-      </div>
-      <div class="suc-card" onclick="selectSuc('CRUCE V. ADELA')">
-        <div class="suc-name">Sucursal Cruce V. Adela</div>
-      </div>
+      <div class="suc-card" onclick="selectSuc('UPEA')"><div class="suc-name">Sucursal UPEA</div></div>
+      <div class="suc-card" onclick="selectSuc('16 DE JULIO')"><div class="suc-name">Sucursal 16 de Julio</div></div>
+      <div class="suc-card" onclick="selectSuc('SATÉLITE')"><div class="suc-name">Sucursal Satélite</div></div>
+      <div class="suc-card" onclick="selectSuc('CRUCE V. ADELA')"><div class="suc-name">Sucursal Cruce V. Adela</div></div>
     </div>
   </div>
 </div>
 
-<!-- ===== LOGIN ===== -->
+<!-- LOGIN -->
 <div class="screen" id="screen-login">
   <div class="login-box">
     <div class="login-back" onclick="goHome()">← Volver</div>
@@ -53,7 +45,7 @@
   </div>
 </div>
 
-<!-- ===== DASHBOARD ===== -->
+<!-- DASHBOARD -->
 <div class="screen" id="screen-dash">
   <div class="topbar">
     <div class="topbar-left">
@@ -77,11 +69,15 @@
       <div class="section-title">Reportes activos <span></span></div>
       <div id="reportes-container"></div>
     </div>
+    <div id="panel-historial" class="panel">
+      <div class="section-title">Historial del mes <span></span></div>
+      <div id="historial-container"></div>
+    </div>
     <div id="panel-admin" class="panel">
       <div class="admin-section">
         <div class="admin-title">Usuarios de esta sucursal</div>
         <div id="admin-users"></div>
-        <button class="add-user-btn" onclick="showToast('Disponible al conectar Firebase')">+ Agregar usuario</button>
+        <button class="add-user-btn" onclick="showAddUserModal()">+ Agregar usuario</button>
       </div>
     </div>
   </div>
@@ -95,19 +91,51 @@
     <textarea id="modal-desc" placeholder="Describe el problema..."></textarea>
     <div style="font-size:11px;color:var(--muted);margin-top:8px">Prioridad</div>
     <div style="display:flex;gap:6px;margin-top:6px">
-      <button class="btn-sm btn-atend" onclick="setPrio('normal')">Normal</button>
-      <button class="btn-sm btn-defer" onclick="setPrio('media')">Media</button>
-      <button class="btn-sm btn-prio" onclick="setPrio('alta')">Alta</button>
+      <button class="btn-sm btn-atend" id="prio-normal" onclick="setPrio('normal')">Normal</button>
+      <button class="btn-sm btn-defer" id="prio-media" onclick="setPrio('media')">Media</button>
+      <button class="btn-sm btn-prio" id="prio-alta" onclick="setPrio('alta')">Alta</button>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-cancel" onclick="closeModal('modal-report')">Cancelar</button>
       <button class="btn-send" onclick="sendReport()">Enviar reporte</button>
     </div>
   </div>
 </div>
 
+<!-- MODAL AGREGAR USUARIO -->
+<div class="modal-overlay" id="modal-add-user">
+  <div class="modal">
+    <div class="modal-title">Agregar usuario</div>
+    <div class="modal-sub">Sucursal: <span id="add-user-suc"></span></div>
+    <div class="field">
+      <label>Nombre completo</label>
+      <input type="text" id="new-name" placeholder="Ej: María López">
+    </div>
+    <div class="field">
+      <label>Usuario (sin espacios)</label>
+      <input type="text" id="new-user" placeholder="Ej: maria.lopez">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="new-pass" placeholder="••••••••">
+    </div>
+    <div class="field">
+      <label>Rol</label>
+      <select id="new-role" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none">
+        <option value="recepcionista">Recepcionista</option>
+        <option value="limpieza">Limpieza</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-add-user')">Cancelar</button>
+      <button class="btn-send" onclick="saveNewUser()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
 
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
