@@ -15,10 +15,10 @@ import {
 // Para agregar otra sucursal: importa su archivo y agrégala aquí.
 // ============================================================
 const TAREAS_POR_SUCURSAL = {
-  'SATELITE': { manana: TAREAS_MANANA, tarde: TAREAS_TARDE, noche: TAREAS_NOCHE },
+  'SATÉLITE': { manana: TAREAS_MANANA, tarde: TAREAS_TARDE, noche: TAREAS_NOCHE },
 };
 const AREAS_POR_SUCURSAL = {
-  'SATELITE': AREAS_REVISION,
+  'SATÉLITE': AREAS_REVISION,
 };
 
 // ============================================================
