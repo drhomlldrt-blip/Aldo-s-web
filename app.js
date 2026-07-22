@@ -542,6 +542,50 @@ function mesDe(fechaStr){
   return fechaStr.slice(0,7); // 'YYYY-MM' a partir de 'YYYY-MM-DD'
 }
 
+// Reconstruye los bloques de área (mismo formato que el checklist en vivo)
+// para una fecha/turno del historial, a partir del estado guardado ese día.
+function renderBloquesHistorial(fecha,turno,estado){
+  const lista = getTareasTurno(turno);
+  if(!lista.length) return '<div class="empty" style="padding:6px 0">Sin tareas configuradas</div>';
+
+  return lista.map(bloque=>{
+    const hechas = bloque.tareas.filter((_,i)=>estado[`${bloque.id}_${i}`]?.hecho).length;
+    const total  = bloque.tareas.length;
+    const pct    = total ? Math.round(hechas/total*100) : 0;
+    const badgeCls = hechas===total?'badge-ok':hechas>0?'badge-pend':'badge-crit';
+    const uid = `${fecha}_${turno}_${bloque.id}`; // id único por fecha+turno+bloque
+
+    return `
+    <div class="area-block">
+      <div class="area-header" onclick="toggleBloque('${uid}')">
+        <div style="flex:1">
+          <div class="area-name">${bloque.area}</div>
+          <div class="area-hora">${bloque.hora}</div>
+        </div>
+        <span class="area-badge ${badgeCls}">${hechas}/${total}</span>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <span class="chevron" id="chev-${uid}">▼</span>
+      </div>
+      <div class="area-items" id="items-${uid}">
+        ${bloque.tareas.map((tarea,i)=>{
+          const key   = `${bloque.id}_${i}`;
+          const dat   = estado[key]||{};
+          const hecho = dat.hecho||false;
+          return `
+          <div class="check-item ${hecho?'item-done':''}">
+            <span class="hist-mark ${hecho?'hist-mark-ok':''}">${hecho?'✓':'—'}</span>
+            <div class="check-content">
+              <div class="check-label ${hecho?'done':''}">${tarea}</div>
+              ${hecho?`<div class="check-meta">✓ ${dat.hora} — ${dat.quien}</div>`:''}
+              ${hecho&&dat.obs?`<div class="check-obs">${dat.obs}</div>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
 async function cargarHistorial(){
   const cont=document.getElementById('historial-container');
   if(!cont) return;
@@ -562,25 +606,24 @@ async function cargarHistorial(){
     }
 
     // Agrupamos por fecha (puede haber varios turnos el mismo día)
+    // Guardamos el estado completo (tareas: {bloqueId_i: {...}}) para poder
+    // reconstruir la vista por área/bloque, igual que el checklist en vivo.
     const porFecha = {};
     docs.forEach(d=>{
       if(!d.fecha || d.fecha < cutoffStr || d.fecha > hoy) return;
       const tareas = d.tareas||{};
-      const hechas = Object.entries(tareas).filter(([,t])=>t.hecho).map(([,t])=>t);
-      if(!hechas.length) return;
+      const hayHechas = Object.values(tareas).some(t=>t.hecho);
+      if(!hayHechas) return;
       if(!porFecha[d.fecha]) porFecha[d.fecha] = {};
-      porFecha[d.fecha][d.turno] = hechas;
+      porFecha[d.fecha][d.turno] = tareas;
     });
 
     const fechas = Object.keys(porFecha).sort((a,b)=>b.localeCompare(a));
     if(!fechas.length){ cont.innerHTML='<div class="empty">Sin actividad registrada en los últimos 7 días</div>'; hideLoading(); return; }
 
-    const renderTurnos = turnos => Object.entries(turnos).map(([turno,hechas])=>`
+    const renderTurnos = (fecha,turnos) => Object.entries(turnos).map(([turno,estado])=>`
       <div class="hist-turno-label">${turnoLabel(turno)}</div>
-      ${hechas.map(t=>`
-        <div class="hist-tarea">✓ ${t.hora} — ${t.quien}
-          ${t.obs?`<span class="hist-obs"> · Obs: ${t.obs}</span>`:''}
-        </div>`).join('')}
+      ${renderBloquesHistorial(fecha,turno,estado)}
     `).join('');
 
     let html='';
@@ -588,7 +631,7 @@ async function cargarHistorial(){
       if(fecha===hoy){
         html += `<div class="hist-card hist-hoy">
           <div class="hist-fecha">${fecha} · Hoy</div>
-          ${renderTurnos(porFecha[fecha])}
+          ${renderTurnos(fecha,porFecha[fecha])}
         </div>`;
       } else {
         html += `<div class="hist-folder">
@@ -598,7 +641,7 @@ async function cargarHistorial(){
             <span class="chevron" id="hist-chev-${fecha}">▼</span>
           </div>
           <div class="hist-folder-body" id="hist-body-${fecha}">
-            ${renderTurnos(porFecha[fecha])}
+            ${renderTurnos(fecha,porFecha[fecha])}
           </div>
         </div>`;
       }
