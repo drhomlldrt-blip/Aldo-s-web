@@ -4,7 +4,7 @@
 // cambia el nombre y actualiza las tareas.
 // ============================================================
 
-export const SUCURSAL_ID = 'SATELITE';
+export const SUCURSAL_ID = 'SATÉLITE';
 export const SUCURSAL_NOMBRE = 'Sucursal Satélite';
 
 // ------------------------------------------------------------
@@ -164,9 +164,9 @@ export const TAREAS_TARDE = [
     tareas: [
       'Limpiar máquinas del área de piso flotante',
       'Trapear piso flotante de área de máquinas',
-      'Trapear piso flotante sector lácteo',
+      'Trapear piso flotante del bar lácteo',
       'Trapear piso flotante de vestidores',
-      'Trapear piso flotante sector recepción',
+      'Trapear piso flotante de recepción (debajo de máquinas también)',
     ]
   },
   {
@@ -174,7 +174,7 @@ export const TAREAS_TARDE = [
     hora: '17:30–17:45',
     area: 'Paredes, ventanas y espejos',
     tareas: [
-      'Limpiar paredes y melaminas de vestidores',
+      'Limpiar paredes de vestidores',
       'Limpiar ventanas',
       'Limpiar espejos del sector de piso flotante',
     ]
@@ -304,8 +304,7 @@ export const AREAS_REVISION = [
   { id: 'rev_maquinas',   nombre: 'Sala de máquinas' },
   { id: 'rev_aerobicos',  nombre: 'Sala de aeróbicos' },
   { id: 'rev_spinning',   nombre: 'Sala de spinning' },
-  { id: 'rev_máquinas',  nombre: 'Piso gaucho' },
-  { id: 'rev_máquinas',     nombre: 'Máquinas' },
-  { id: 'rev_flotante',   nombre: 'Piso flotante' },
-  { id: 'rev_cardio',     nombre: 'Equipos de cardio' },
+  { id: 'rev_recepcion',  nombre: 'Área de recepción' },
+  { id: 'rev_flotante',   nombre: 'Pisos flotantes' },
+  { id: 'rev_cardio',     nombre: 'Área de cardio' },
 ];

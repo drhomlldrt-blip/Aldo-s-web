@@ -3,23 +3,31 @@
 // ============================================================
 import { db } from './firebase.js';
 import { USERS_FIJOS } from './usuarios.js';
-import { TAREAS_MANANA, TAREAS_TARDE, TAREAS_NOCHE, AREAS_REVISION } from './data/satelite.js';
+import * as SATELITE from './data/satelite.js';
+import * as UPEA     from './data/upea.js';
+import * as JUL16     from './data/jul16.js';
+import * as CEJA      from './data/ceja.js';
+import * as CRUCE     from './data/cruce.js';
 import {
   collection, doc, setDoc, getDoc, getDocs,
   updateDoc, deleteDoc, query, where
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
 // ============================================================
-// TAREAS POR SUCURSAL
-// Solo SATELITE tiene tareas por ahora.
-// Para agregar otra sucursal: importa su archivo y agrégala aquí.
+// TAREAS Y ÁREAS POR SUCURSAL
+// Cada archivo de datos exporta SUCURSAL_ID, que debe coincidir
+// EXACTO con el valor que manda selectSuc() en index.html.
+// Para agregar otra sucursal: importa su archivo arriba y
+// agrégalo a este arreglo.
 // ============================================================
-const TAREAS_POR_SUCURSAL = {
-  'SATÉLITE': { manana: TAREAS_MANANA, tarde: TAREAS_TARDE, noche: TAREAS_NOCHE },
-};
-const AREAS_POR_SUCURSAL = {
-  'SATÉLITE': AREAS_REVISION,
-};
+const SUCURSALES_DATA = [SATELITE, UPEA, JUL16, CEJA, CRUCE];
+
+const TAREAS_POR_SUCURSAL = {};
+const AREAS_POR_SUCURSAL  = {};
+SUCURSALES_DATA.forEach(mod=>{
+  TAREAS_POR_SUCURSAL[mod.SUCURSAL_ID] = { manana: mod.TAREAS_MANANA, tarde: mod.TAREAS_TARDE, noche: mod.TAREAS_NOCHE };
+  AREAS_POR_SUCURSAL[mod.SUCURSAL_ID]  = mod.AREAS_REVISION;
+});
 
 // ============================================================
 // ESTADO GLOBAL
@@ -524,33 +532,89 @@ window.reportarNoAtendido=async function(id){
 
 // ============================================================
 // HISTORIAL
+// El día de hoy se muestra abierto tal como se va haciendo.
+// A partir del día siguiente, cada fecha pasa a ser una carpeta
+// plegable (colapsada por defecto, pero se puede abrir para ver
+// el detalle completo). Las fechas de más de 7 días de antigüedad
+// dejan de mostrarse.
 // ============================================================
+function mesDe(fechaStr){
+  return fechaStr.slice(0,7); // 'YYYY-MM' a partir de 'YYYY-MM-DD'
+}
+
 async function cargarHistorial(){
   const cont=document.getElementById('historial-container');
   if(!cont) return;
   showLoading();
   try {
-    const q=query(collection(db,'checklists'),where('sucursal','==',currentSuc),where('mes','==',mesActual()));
-    const snap=await getDocs(q);
-    const docs=snap.docs.map(d=>d.data()).sort((a,b)=>b.fecha.localeCompare(a.fecha));
-    if(!docs.length){ cont.innerHTML='<div class="empty">Sin historial este mes</div>'; hideLoading(); return; }
-    let html='';
+    const hoy = fechaHoy();
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate()-6); // ventana de 7 días (hoy + 6 anteriores)
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+
+    // Puede que la ventana de 7 días cruce de un mes a otro
+    const meses = new Set([mesActual(), mesDe(cutoffStr)]);
+    let docs = [];
+    for(const mes of meses){
+      const q=query(collection(db,'checklists'),where('sucursal','==',currentSuc),where('mes','==',mes));
+      const snap=await getDocs(q);
+      docs.push(...snap.docs.map(d=>d.data()));
+    }
+
+    // Agrupamos por fecha (puede haber varios turnos el mismo día)
+    const porFecha = {};
     docs.forEach(d=>{
-      const tareas=d.tareas||{};
-      const hechas=Object.entries(tareas).filter(([,t])=>t.hecho);
+      if(!d.fecha || d.fecha < cutoffStr || d.fecha > hoy) return;
+      const tareas = d.tareas||{};
+      const hechas = Object.entries(tareas).filter(([,t])=>t.hecho).map(([,t])=>t);
       if(!hechas.length) return;
-      html+=`<div class="hist-card">
-        <div class="hist-fecha">${d.fecha} · ${turnoLabel(d.turno)}</div>
-        ${hechas.map(([,t])=>`
-          <div class="hist-tarea">✓ ${t.hora} — ${t.quien}
-            ${t.obs?`<span class="hist-obs"> · Obs: ${t.obs}</span>`:''}
-          </div>`).join('')}
-      </div>`;
+      if(!porFecha[d.fecha]) porFecha[d.fecha] = {};
+      porFecha[d.fecha][d.turno] = hechas;
     });
-    cont.innerHTML=html||'<div class="empty">Sin actividad registrada</div>';
+
+    const fechas = Object.keys(porFecha).sort((a,b)=>b.localeCompare(a));
+    if(!fechas.length){ cont.innerHTML='<div class="empty">Sin actividad registrada en los últimos 7 días</div>'; hideLoading(); return; }
+
+    const renderTurnos = turnos => Object.entries(turnos).map(([turno,hechas])=>`
+      <div class="hist-turno-label">${turnoLabel(turno)}</div>
+      ${hechas.map(t=>`
+        <div class="hist-tarea">✓ ${t.hora} — ${t.quien}
+          ${t.obs?`<span class="hist-obs"> · Obs: ${t.obs}</span>`:''}
+        </div>`).join('')}
+    `).join('');
+
+    let html='';
+    fechas.forEach(fecha=>{
+      if(fecha===hoy){
+        html += `<div class="hist-card hist-hoy">
+          <div class="hist-fecha">${fecha} · Hoy</div>
+          ${renderTurnos(porFecha[fecha])}
+        </div>`;
+      } else {
+        html += `<div class="hist-folder">
+          <div class="hist-folder-header" onclick="toggleHistDia('${fecha}')">
+            <span class="hist-folder-icon">📁</span>
+            <span class="hist-fecha" style="margin:0">${fecha}</span>
+            <span class="chevron" id="hist-chev-${fecha}">▼</span>
+          </div>
+          <div class="hist-folder-body" id="hist-body-${fecha}">
+            ${renderTurnos(porFecha[fecha])}
+          </div>
+        </div>`;
+      }
+    });
+    cont.innerHTML=html;
   } catch(e){ cont.innerHTML='<div class="empty">Error al cargar</div>'; }
   hideLoading();
 }
+
+window.toggleHistDia = function(fecha){
+  const body=document.getElementById('hist-body-'+fecha);
+  const chev=document.getElementById('hist-chev-'+fecha);
+  if(!body) return;
+  body.classList.toggle('open');
+  chev.textContent = body.classList.contains('open') ? '▲' : '▼';
+};
 
 // ============================================================
 // ALERTAS

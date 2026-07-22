@@ -296,6 +296,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .hist-fecha{font-size:11px;color:var(--neon);font-weight:700;margin-bottom:8px;letter-spacing:.5px}
 .hist-tarea{font-size:12px;color:var(--text2);padding:3px 0}
 .hist-obs{color:#4ab0e8}
+.hist-hoy{border-color:rgba(184,244,0,0.35)}
+.hist-turno-label{font-size:10px;color:var(--gray);font-weight:700;letter-spacing:.5px;margin:10px 0 4px;text-transform:uppercase}
+.hist-turno-label:first-child{margin-top:0}
+
+.hist-folder{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:var(--radius);margin-bottom:10px;overflow:hidden;transition:border .2s;
+}
+.hist-folder:hover{border-color:var(--border2)}
+.hist-folder-header{
+  padding:12px 16px;display:flex;align-items:center;gap:10px;
+  cursor:pointer;user-select:none;transition:background .2s;
+}
+.hist-folder-header:hover{background:var(--surface2)}
+.hist-folder-icon{font-size:14px;flex-shrink:0}
+.hist-folder-header .hist-fecha{flex:1;margin-bottom:0}
+.hist-folder-body{border-top:1px solid var(--border);padding:12px 16px;display:none}
+.hist-folder-body.open{display:block}
 
 /* ===================== ADMIN ===================== */
 .admin-title{font-size:10px;letter-spacing:2px;color:var(--gray2);text-transform:uppercase;margin-bottom:14px}
