@@ -276,17 +276,29 @@ export const TAREAS_NOCHE = [
   {
     id: "ceja_noc_03",
     hora: "18:55–19:20",
-    area: "Basureros",
+    area: "Otras tareas",
     tareas: [
       "Barrer y trapear pisos flotantes",
-      "De: 19:25 a 19:45 (20min)",
-      "Lavar y limpiar basureros",
-      "De: 19:45 a 19:50 (5min)",
-      "Trapear spinning",
     ]
   },
   {
     id: "ceja_noc_04",
+    hora: "19:25–19:45",
+    area: "Basureros",
+    tareas: [
+      "Lavar y limpiar basureros",
+    ]
+  },
+  {
+    id: "ceja_noc_05",
+    hora: "19:45–19:50",
+    area: "Sala de spinning",
+    tareas: [
+      "Trapear spinning",
+    ]
+  },
+  {
+    id: "ceja_noc_06",
     hora: "19:50–20:10",
     area: "Baños",
     tareas: [
@@ -297,7 +309,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "ceja_noc_05",
+    id: "ceja_noc_07",
     hora: "20:10–20:15",
     area: "Cardio / Trotadoras",
     tareas: [
@@ -305,7 +317,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "ceja_noc_06",
+    id: "ceja_noc_08",
     hora: "20:15–20:30",
     area: "Área de máquinas (piso de goma)",
     tareas: [
@@ -314,7 +326,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "ceja_noc_07",
+    id: "ceja_noc_09",
     hora: "21:00–21:30",
     area: "Sala de spinning",
     tareas: [
@@ -324,7 +336,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "ceja_noc_08",
+    id: "ceja_noc_10",
     hora: "21:30–21:50",
     area: "Implementos de limpieza",
     tareas: [
@@ -335,7 +347,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "ceja_noc_09",
+    id: "ceja_noc_11",
     hora: "21:50–22:00",
     area: "Baños",
     tareas: [
@@ -343,7 +355,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "ceja_noc_10",
+    id: "ceja_noc_12",
     hora: "22:00–22:20",
     area: "Sala de aeróbicos",
     tareas: [
@@ -352,7 +364,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "ceja_noc_11",
+    id: "ceja_noc_13",
     hora: "22:20–22:30",
     area: "Basureros",
     tareas: [
@@ -361,7 +373,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "ceja_noc_12",
+    id: "ceja_noc_14",
     hora: "22:30–fin",
     area: "Tiempo de imprevistos",
     tareas: [

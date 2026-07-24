@@ -272,12 +272,18 @@ export const TAREAS_NOCHE = [
     area: "Sala de spinning",
     tareas: [
       "Trapear spinning",
-      "De: 19:25 a 19:45 (20min)",
-      "Lavar y limpiar basureros y asientos",
     ]
   },
   {
     id: "cruce_noc_05",
+    hora: "19:25–19:45",
+    area: "Basureros",
+    tareas: [
+      "Lavar y limpiar basureros y asientos",
+    ]
+  },
+  {
+    id: "cruce_noc_06",
     hora: "19:45–20:00",
     area: "Baños",
     tareas: [
@@ -287,7 +293,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "cruce_noc_06",
+    id: "cruce_noc_07",
     hora: "20:00–20:25",
     area: "Implementos de limpieza",
     tareas: [
@@ -298,7 +304,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "cruce_noc_07",
+    id: "cruce_noc_08",
     hora: "20:25–20:30",
     area: "Cardio / Trotadoras",
     tareas: [
@@ -306,7 +312,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "cruce_noc_08",
+    id: "cruce_noc_09",
     hora: "20:30–21:00",
     area: "Sala de spinning",
     tareas: [
@@ -316,7 +322,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "cruce_noc_09",
+    id: "cruce_noc_10",
     hora: "21:00–21:40",
     area: "Sala de aeróbicos",
     tareas: [
@@ -330,7 +336,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "cruce_noc_10",
+    id: "cruce_noc_11",
     hora: "21:40–21:55",
     area: "Área de máquinas (piso de goma)",
     tareas: [
@@ -339,7 +345,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "cruce_noc_11",
+    id: "cruce_noc_12",
     hora: "21:55–22:05",
     area: "Baños",
     tareas: [
@@ -347,7 +353,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "cruce_noc_12",
+    id: "cruce_noc_13",
     hora: "22:20–22:30",
     area: "Basureros",
     tareas: [
@@ -355,7 +361,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "cruce_noc_13",
+    id: "cruce_noc_14",
     hora: "22:30–fin",
     area: "Tiempo de imprevistos",
     tareas: [
