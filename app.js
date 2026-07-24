@@ -76,9 +76,16 @@ window.selectSuc = function(suc){
   // Supervisor: cambiar sucursal sin re-login
   if(currentUser && currentUser.role === 'supervisor'){
     document.getElementById('dash-suc').textContent = currentSuc;
+    guardarSesion();
     showLoading();
     Promise.all([renderChecklist(), cargarReportes()]).then(()=>{
       if(currentUser.role==='supervisor') cargarAlertas();
+      const panelActivo = document.querySelector('.panel.active');
+      if(panelActivo){
+        if(panelActivo.id==='panel-historial')  cargarHistorial();
+        if(panelActivo.id==='panel-aerobicos')  initClasesPanel('aerobicos');
+        if(panelActivo.id==='panel-spinning')   initClasesPanel('spinning');
+      }
       hideLoading();
       show('screen-dash');
       showToast('Sucursal cambiada: ' + suc);
@@ -113,6 +120,7 @@ window.doLogin = async function(){
     const user = USERS_FIJOS[u];
     if(user.pass !== p){ hideLoading(); err.textContent='Contraseña incorrecta'; err.style.display='block'; return; }
     currentUser = {...user, username:u};
+    guardarSesion();
     await loadDash(); return;
   }
 
@@ -123,11 +131,12 @@ window.doLogin = async function(){
     if(user.pass !== p){ hideLoading(); err.textContent='Contraseña incorrecta'; err.style.display='block'; return; }
     if(user.suc !== currentSuc){ hideLoading(); err.textContent='No tienes acceso a esta sucursal'; err.style.display='block'; return; }
     currentUser = {...user, username:u};
+    guardarSesion();
     await loadDash();
   } catch(e){ hideLoading(); err.textContent='Error de conexión'; err.style.display='block'; }
 };
 
-window.doLogout = function(){ currentUser=null; reportes=[]; usuarios=[]; goHome(); };
+window.doLogout = function(){ currentUser=null; reportes=[]; usuarios=[]; borrarSesion(); goHome(); };
 document.getElementById('inp-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 
 // ============================================================
@@ -152,6 +161,8 @@ async function loadDash(){
       {id:'panel-checklist', label:'Checklist'},
       {id:'panel-reportes',  label:'Reportes'},
       {id:'panel-historial', label:'Historial'},
+      {id:'panel-aerobicos', label:'Aeróbicos'},
+      {id:'panel-spinning',  label:'Spinning'},
       {id:'panel-alertas',   label:'Alertas'},
       {id:'panel-admin',     label:'Usuarios'},
     ];
@@ -159,6 +170,8 @@ async function loadDash(){
     tabs=[
       {id:'panel-revision',  label:'Revisión áreas'},
       {id:'panel-reportes',  label:'Mis reportes'},
+      {id:'panel-aerobicos', label:'Aeróbicos'},
+      {id:'panel-spinning',  label:'Spinning'},
     ];
   } else if(currentUser.role==='limpieza'){
     tabs=[
@@ -167,7 +180,7 @@ async function loadDash(){
     ];
   }
 
-  const allPanels=['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin'];
+  const allPanels=['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin','panel-aerobicos','panel-spinning'];
   allPanels.forEach(p=>document.getElementById(p).classList.remove('active'));
 
   const tabsEl=document.getElementById('tabs-container');
@@ -182,9 +195,12 @@ async function loadDash(){
       el.classList.add('active');
       allPanels.forEach(p=>document.getElementById(p).classList.remove('active'));
       document.getElementById(t.id).classList.add('active');
-      if(t.id==='panel-historial') cargarHistorial();
-      if(t.id==='panel-alertas')   cargarAlertas();
-      if(t.id==='panel-admin')     cargarUsuarios();
+      guardarPanelActivo(t.id);
+      if(t.id==='panel-historial')  cargarHistorial();
+      if(t.id==='panel-alertas')    cargarAlertas();
+      if(t.id==='panel-admin')      cargarUsuarios();
+      if(t.id==='panel-aerobicos')  initClasesPanel('aerobicos');
+      if(t.id==='panel-spinning')   initClasesPanel('spinning');
     };
     tabsEl.appendChild(el);
   });
@@ -751,3 +767,525 @@ window.eliminarUsuario=async function(id){
   } catch(e){ showToast('Error','err'); }
   hideLoading();
 };
+
+// ============================================================
+// AERÓBICOS / SPINNING
+// Datos por sucursal, guardados en Firestore:
+//   'clases'            -> horario recurrente semanal (día fijo)
+//   'historial_clases'  -> asistencia/incidencias por fecha (doc id: claseId_fecha)
+//   'especiales'        -> clases sueltas (feriados, fines de semana)
+//   'solicitudes_borrado' -> pedidos de recepción para borrar una clase,
+//                            que el supervisor debe aprobar o rechazar
+// ============================================================
+const DIAS = [
+  {id:'lunes',label:'Lunes'},{id:'martes',label:'Martes'},{id:'miercoles',label:'Miércoles'},
+  {id:'jueves',label:'Jueves'},{id:'viernes',label:'Viernes'},{id:'sabado',label:'Sábado'},{id:'domingo',label:'Domingo'},
+];
+function diaLabel(id){ const d=DIAS.find(x=>x.id===id); return d?d.label:id; }
+function diaHoyId(){ return ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'][new Date().getDay()]; }
+
+let clasesData      = {aerobicos:[], spinning:[]};
+let especialesData  = {aerobicos:[], spinning:[]};
+let solicitudesData = {aerobicos:[], spinning:[]};
+let histClaseCache  = {}; // claseId -> registros ordenados desc por fecha
+
+function calcularAntiguedad(fechaInicio){
+  if(!fechaInicio) return '—';
+  const ini=new Date(fechaInicio+'T00:00:00'), hoy=new Date();
+  let meses=(hoy.getFullYear()-ini.getFullYear())*12+(hoy.getMonth()-ini.getMonth());
+  if(hoy.getDate()<ini.getDate()) meses--;
+  if(meses<0) return '—';
+  const anios=Math.floor(meses/12), rest=meses%12;
+  return anios>0 ? `${anios}a ${rest}m` : `${rest}m`;
+}
+function estadoHistLabel(e){ return {dictada:'Dictada',cancelada:'Cancelada',atraso:'Atraso',ausencia:'Ausencia',reemplazo:'Reemplazo'}[e]||e; }
+function estadoEspecialLabel(e){ return {reservado:'Reservado',confirmado:'Confirmado',realizado:'Realizado',cancelado:'Cancelado'}[e]||e; }
+function formatoFechaCorta(fecha){ if(!fecha) return '—'; const [y,m,d]=fecha.split('-'); return `${d}/${m}`; }
+
+// ------------------------------------------------------------
+// Entrada del panel (se llama al abrir la pestaña)
+// ------------------------------------------------------------
+window.initClasesPanel = async function(tipo){
+  showLoading();
+  try{
+    const qc=query(collection(db,'clases'),where('sucursal','==',currentSuc),where('tipo','==',tipo));
+    const sc=await getDocs(qc);
+    clasesData[tipo]=sc.docs.map(d=>({id:d.id,...d.data()}));
+
+    const qe=query(collection(db,'especiales'),where('sucursal','==',currentSuc),where('tipo','==',tipo));
+    const se=await getDocs(qe);
+    especialesData[tipo]=se.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+
+    if(currentUser.role==='supervisor'){
+      const qs=query(collection(db,'solicitudes_borrado'),where('sucursal','==',currentSuc),where('tipoClase','==',tipo),where('estado','==','pendiente'));
+      const ss=await getDocs(qs);
+      solicitudesData[tipo]=ss.docs.map(d=>({id:d.id,...d.data()}));
+    } else {
+      solicitudesData[tipo]=[];
+    }
+  } catch(e){ showToast('Error al cargar horario','err'); }
+  hideLoading();
+  renderHorarioTipo(tipo);
+  renderEspecialesTipo(tipo);
+  cambiarVistaClases(tipo,'horario');
+};
+
+window.cambiarVistaClases = function(tipo,vista){
+  document.querySelectorAll(`#switch-${tipo} .clases-switch-btn`).forEach(b=>b.classList.remove('active'));
+  const btn=document.querySelector(`#switch-${tipo} [data-vista="${vista}"]`);
+  if(btn) btn.classList.add('active');
+  document.getElementById(`${tipo}-horario-container`).style.display    = vista==='horario'?'block':'none';
+  document.getElementById(`${tipo}-especiales-container`).style.display = vista==='especiales'?'block':'none';
+  document.getElementById(`btn-nueva-clase-${tipo}`).style.display    = (vista==='horario' && currentUser.role==='supervisor')?'inline-block':'none';
+  document.getElementById(`btn-nueva-especial-${tipo}`).style.display = vista==='especiales'?'inline-block':'none';
+};
+
+// ------------------------------------------------------------
+// HORARIO SEMANAL
+// ------------------------------------------------------------
+function renderHorarioTipo(tipo){
+  const cont=document.getElementById(`${tipo}-horario-container`);
+  if(!cont) return;
+  const esSup=currentUser.role==='supervisor';
+  let html='';
+
+  if(esSup && solicitudesData[tipo].length){
+    html+=`<div class="solicitudes-box">
+      <div class="solicitudes-title">⚠ Solicitudes de eliminación pendientes</div>
+      ${solicitudesData[tipo].map(s=>`
+        <div class="solicitud-row">
+          <div class="solicitud-info">
+            <div class="solicitud-resumen">${s.resumen}</div>
+            <div class="solicitud-meta">Pedido por ${s.solicitadoPor}</div>
+          </div>
+          <div class="solicitud-btns">
+            <button class="btn-mini btn-mini-ok" onclick="resolverSolicitud('${s.id}','${tipo}',true)">Aprobar</button>
+            <button class="btn-mini btn-mini-no" onclick="resolverSolicitud('${s.id}','${tipo}',false)">Rechazar</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  const lista=clasesData[tipo];
+  if(!lista.length){
+    cont.innerHTML=html+'<div class="empty">Sin clases programadas todavía</div>';
+    return;
+  }
+
+  const hoyId=diaHoyId();
+  DIAS.forEach(dia=>{
+    const claseDia=lista.filter(c=>c.dia===dia.id).sort((a,b)=>a.horaIni.localeCompare(b.horaIni));
+    if(!claseDia.length) return;
+    const uidDia=`${tipo}-${dia.id}`;
+    const abierto=dia.id===hoyId;
+    html+=`
+    <div class="dia-acordeon">
+      <div class="dia-header" onclick="toggleDiaAcordeon('${uidDia}')">
+        <span class="dia-nombre">${dia.label}${abierto?' · Hoy':''}</span>
+        <span class="dia-count">${claseDia.length} clase${claseDia.length>1?'s':''} <span class="chevron" id="chev-dia-${uidDia}">${abierto?'▲':'▼'}</span></span>
+      </div>
+      <div class="dia-body${abierto?' open':''}" id="body-dia-${uidDia}">
+        ${claseDia.map(c=>renderSlotCard(tipo,c)).join('')}
+      </div>
+    </div>`;
+  });
+
+  cont.innerHTML=html;
+}
+
+window.toggleDiaAcordeon=function(uid){
+  const body=document.getElementById('body-dia-'+uid), chev=document.getElementById('chev-dia-'+uid);
+  if(!body) return;
+  body.classList.toggle('open');
+  chev.textContent=body.classList.contains('open')?'▲':'▼';
+};
+
+function renderSlotCard(tipo,c){
+  const esSup=currentUser.role==='supervisor';
+  const uid=`${tipo}-${c.id}`;
+  const antig=calcularAntiguedad(c.fechaInicio);
+  const disciplinaTxt=tipo==='aerobicos'?(c.disciplina||''):'Spinning';
+  const yaSolicitada=solicitudesData[tipo].some(s=>s.claseId===c.id);
+
+  return `
+  <div class="slot-card">
+    <div class="slot-header" onclick="toggleSlotCard('${tipo}','${c.id}')">
+      <div class="slot-hora">${c.horaIni}–${c.horaFin}</div>
+      <div class="slot-info">
+        <div class="slot-instructor">${c.instructor}</div>
+        <div class="slot-disciplina">${disciplinaTxt}</div>
+      </div>
+      <div class="slot-actions">
+        ${esSup?`
+          <button class="slot-icon-btn" onclick="event.stopPropagation();abrirModalClase('${tipo}','${c.id}')" title="Editar">✎</button>
+        `:`
+          <button class="slot-icon-btn" onclick="event.stopPropagation();solicitarBorradoClase('${tipo}','${c.id}')" title="Solicitar eliminación" ${yaSolicitada?'disabled style="opacity:.4"':''}>🗑</button>
+        `}
+        <span class="chevron" id="chev-slot-${uid}">▼</span>
+      </div>
+    </div>
+    <div class="slot-body" id="body-slot-${uid}">
+      <div class="slot-detail-row">
+        <div>Costo por clase: <strong>Bs ${c.costo||0}</strong></div>
+        <div>Celular: <strong>${c.celular||'—'}</strong></div>
+        <div>Antigüedad: <strong>${antig}</strong></div>
+      </div>
+      <button class="slot-btn-registrar" onclick="abrirModalHistClase('${tipo}','${c.id}')">+ Registrar clase de hoy</button>
+      <div class="hist-mini-title">Historial reciente</div>
+      <div id="hist-mini-${uid}"><div class="empty" style="padding:12px 0">Toca para ver</div></div>
+    </div>
+  </div>`;
+}
+
+window.toggleSlotCard=async function(tipo,claseId){
+  const uid=`${tipo}-${claseId}`;
+  const body=document.getElementById('body-slot-'+uid), chev=document.getElementById('chev-slot-'+uid);
+  if(!body) return;
+  const abriendo=!body.classList.contains('open');
+  body.classList.toggle('open');
+  chev.textContent=body.classList.contains('open')?'▲':'▼';
+  if(abriendo && !histClaseCache[claseId]) await cargarHistMiniClase(tipo,claseId);
+};
+
+async function cargarHistMiniClase(tipo,claseId){
+  try{
+    const q=query(collection(db,'historial_clases'),where('claseId','==',claseId));
+    const snap=await getDocs(q);
+    histClaseCache[claseId]=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  }catch(e){ histClaseCache[claseId]=[]; }
+  renderHistMini(tipo,claseId);
+}
+
+function renderHistMini(tipo,claseId){
+  const cont=document.getElementById(`hist-mini-${tipo}-${claseId}`);
+  if(!cont) return;
+  const regs=(histClaseCache[claseId]||[]).slice(0,8);
+  if(!regs.length){ cont.innerHTML='<div class="empty" style="padding:12px 0">Sin registros todavía</div>'; return; }
+  cont.innerHTML=regs.map(r=>`
+    <div class="hist-mini-row">
+      <span class="hist-mini-fecha">${r.fecha}</span>
+      <span class="estado-badge estado-${r.estado}">${estadoHistLabel(r.estado)}</span>
+      <span>${r.clientes!=null?r.clientes+' clientes':''}</span>
+      ${r.estado==='atraso'&&r.atrasoMin?`<span>${r.atrasoMin} min atraso</span>`:''}
+      ${r.estado==='reemplazo'&&r.reemplazoNombre?`<span>Reemplazo: ${r.reemplazoNombre}</span>`:''}
+    </div>`).join('');
+}
+
+// ------------------------------------------------------------
+// MODAL: crear/editar clase (SOLO SUPERVISOR)
+// ------------------------------------------------------------
+window.abrirModalClase=function(tipo,claseId=null){
+  document.getElementById('clase-tipo').value=tipo;
+  document.getElementById('clase-id-edit').value=claseId||'';
+  document.getElementById('modal-clase-titulo').textContent=claseId?'Editar clase':'Nueva clase';
+  document.getElementById('campo-disciplina').style.display=tipo==='aerobicos'?'block':'none';
+  document.getElementById('btn-borrar-clase').style.display=claseId?'inline-block':'none';
+
+  const c=claseId?clasesData[tipo].find(x=>x.id===claseId):null;
+  document.getElementById('clase-dia').value=c?c.dia:'lunes';
+  document.getElementById('clase-hora-ini').value=c?c.horaIni:'';
+  document.getElementById('clase-hora-fin').value=c?c.horaFin:'';
+  document.getElementById('clase-instructor').value=c?c.instructor:'';
+  document.getElementById('clase-disciplina').value=c?(c.disciplina||''):'';
+  document.getElementById('clase-costo').value=c?(c.costo||''):'';
+  document.getElementById('clase-celular').value=c?(c.celular||''):'';
+  document.getElementById('clase-fecha-inicio').value=c?(c.fechaInicio||''):fechaHoy();
+  document.getElementById('modal-clase').classList.add('open');
+};
+
+window.guardarClase=async function(){
+  const tipo=document.getElementById('clase-tipo').value;
+  const claseId=document.getElementById('clase-id-edit').value;
+  const dia=document.getElementById('clase-dia').value;
+  const horaIni=document.getElementById('clase-hora-ini').value;
+  const horaFin=document.getElementById('clase-hora-fin').value;
+  const instructor=document.getElementById('clase-instructor').value.trim();
+  const disciplina=tipo==='aerobicos'?document.getElementById('clase-disciplina').value.trim():'Spinning';
+  const costo=Number(document.getElementById('clase-costo').value)||0;
+  const celular=document.getElementById('clase-celular').value.trim();
+  const fechaInicio=document.getElementById('clase-fecha-inicio').value||fechaHoy();
+
+  if(!horaIni||!horaFin||!instructor||(tipo==='aerobicos'&&!disciplina)){ showToast('Completa los campos obligatorios','err'); return; }
+  showLoading();
+  try{
+    const data={sucursal:currentSuc,tipo,dia,horaIni,horaFin,instructor,disciplina,costo,celular,fechaInicio,
+      actualizadoPor:currentUser.name,actualizadoEn:new Date().toISOString()};
+    if(claseId){
+      await updateDoc(doc(db,'clases',claseId),data);
+    } else {
+      data.creadoPor=currentUser.name; data.creadoEn=new Date().toISOString();
+      await setDoc(doc(collection(db,'clases')),data);
+    }
+    closeModal('modal-clase');
+    showToast('Clase guardada');
+    await initClasesPanel(tipo);
+  }catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
+};
+
+// Solo llamable desde dentro del modal de edición → siempre supervisor
+window.borrarClase=async function(){
+  const tipo=document.getElementById('clase-tipo').value;
+  const claseId=document.getElementById('clase-id-edit').value;
+  if(!claseId) return;
+  if(!confirm('¿Eliminar esta clase del horario? También se borrará su historial.')) return;
+  showLoading();
+  try{
+    const qh=query(collection(db,'historial_clases'),where('claseId','==',claseId));
+    const sh=await getDocs(qh);
+    await Promise.all(sh.docs.map(d=>deleteDoc(doc(db,'historial_clases',d.id))));
+
+    const qs=query(collection(db,'solicitudes_borrado'),where('claseId','==',claseId),where('estado','==','pendiente'));
+    const ss=await getDocs(qs);
+    await Promise.all(ss.docs.map(d=>updateDoc(doc(db,'solicitudes_borrado',d.id),{estado:'aprobado',resueltoPor:currentUser.name,resueltoEn:new Date().toISOString()})));
+
+    await deleteDoc(doc(db,'clases',claseId));
+    delete histClaseCache[claseId];
+    closeModal('modal-clase');
+    showToast('Clase eliminada');
+    await initClasesPanel(tipo);
+  }catch(e){ showToast('Error al eliminar','err'); }
+  hideLoading();
+};
+
+// ------------------------------------------------------------
+// SOLICITUD DE BORRADO (recepción) + aprobación (supervisor)
+// ------------------------------------------------------------
+window.solicitarBorradoClase=async function(tipo,claseId){
+  const c=clasesData[tipo].find(x=>x.id===claseId);
+  if(!c) return;
+  if(solicitudesData[tipo].some(s=>s.claseId===claseId)){ showToast('Ya hay una solicitud pendiente para esta clase','err'); return; }
+  if(!confirm(`¿Enviar solicitud para eliminar la clase de ${diaLabel(c.dia)} ${c.horaIni} con ${c.instructor}? El supervisor debe aprobarla.`)) return;
+  showLoading();
+  try{
+    await setDoc(doc(collection(db,'solicitudes_borrado')),{
+      tipo:'clase', claseId, sucursal:currentSuc, tipoClase:tipo,
+      resumen:`${diaLabel(c.dia)} ${c.horaIni}–${c.horaFin} · ${c.instructor}${tipo==='aerobicos'&&c.disciplina?' ('+c.disciplina+')':''}`,
+      solicitadoPor:currentUser.name, solicitadoEn:new Date().toISOString(), estado:'pendiente',
+    });
+    showToast('Solicitud enviada. El supervisor debe aprobarla.');
+    await initClasesPanel(tipo);
+  }catch(e){ showToast('Error al enviar la solicitud','err'); }
+  hideLoading();
+};
+
+window.resolverSolicitud=async function(id,tipo,aprobar){
+  const s=solicitudesData[tipo].find(x=>x.id===id);
+  if(!s) return;
+  showLoading();
+  try{
+    if(aprobar){
+      const qh=query(collection(db,'historial_clases'),where('claseId','==',s.claseId));
+      const sh=await getDocs(qh);
+      await Promise.all(sh.docs.map(d=>deleteDoc(doc(db,'historial_clases',d.id))));
+      await deleteDoc(doc(db,'clases',s.claseId));
+      delete histClaseCache[s.claseId];
+    }
+    await updateDoc(doc(db,'solicitudes_borrado',id),{estado:aprobar?'aprobado':'rechazado',resueltoPor:currentUser.name,resueltoEn:new Date().toISOString()});
+    showToast(aprobar?'Clase eliminada':'Solicitud rechazada');
+    await initClasesPanel(tipo);
+  }catch(e){ showToast('Error','err'); }
+  hideLoading();
+};
+
+// ------------------------------------------------------------
+// MODAL: registrar historial del día (recepción + supervisor)
+// ------------------------------------------------------------
+window.abrirModalHistClase=function(tipo,claseId){
+  const c=clasesData[tipo].find(x=>x.id===claseId);
+  if(!c) return;
+  document.getElementById('hist-clase-tipo').value=tipo;
+  document.getElementById('hist-clase-id').value=claseId;
+  document.getElementById('modal-hist-clase-sub').textContent=`${diaLabel(c.dia)} ${c.horaIni}–${c.horaFin} · ${c.instructor}`;
+  document.getElementById('hist-clase-fecha').value=fechaHoy();
+  document.getElementById('hist-clase-estado').value='dictada';
+  document.getElementById('hist-clase-clientes').value='';
+  document.getElementById('hist-clase-atraso').value='';
+  document.getElementById('hist-clase-reemplazo').value='';
+  document.getElementById('hist-clase-obs').value='';
+  onCambioEstadoHist();
+  document.getElementById('modal-hist-clase').classList.add('open');
+};
+
+window.onCambioEstadoHist=function(){
+  const est=document.getElementById('hist-clase-estado').value;
+  document.getElementById('campo-atraso').style.display=est==='atraso'?'block':'none';
+  document.getElementById('campo-reemplazo').style.display=est==='reemplazo'?'block':'none';
+};
+
+window.guardarHistClase=async function(){
+  const tipo=document.getElementById('hist-clase-tipo').value;
+  const claseId=document.getElementById('hist-clase-id').value;
+  const fecha=document.getElementById('hist-clase-fecha').value||fechaHoy();
+  const estado=document.getElementById('hist-clase-estado').value;
+  const clientes=Number(document.getElementById('hist-clase-clientes').value)||0;
+  const atrasoMin=Number(document.getElementById('hist-clase-atraso').value)||0;
+  const reemplazoNombre=document.getElementById('hist-clase-reemplazo').value.trim();
+  const obs=document.getElementById('hist-clase-obs').value.trim();
+  if(!claseId) return;
+  showLoading();
+  try{
+    await setDoc(doc(db,'historial_clases',`${claseId}_${fecha}`),{
+      claseId, sucursal:currentSuc, tipo, fecha, estado, clientes,
+      atrasoMin: estado==='atraso'?atrasoMin:null,
+      reemplazoNombre: estado==='reemplazo'?reemplazoNombre:null,
+      obs, registradoPor:currentUser.name, registradoEn:new Date().toISOString(),
+    });
+    closeModal('modal-hist-clase');
+    showToast('Registro guardado');
+    delete histClaseCache[claseId];
+    await cargarHistMiniClase(tipo,claseId);
+  }catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
+};
+
+// ------------------------------------------------------------
+// CLASES ESPECIALES (feriados / fines de semana)
+// Tanto supervisor como recepción pueden crear, editar y borrar.
+// ------------------------------------------------------------
+function renderEspecialesTipo(tipo){
+  const cont=document.getElementById(`${tipo}-especiales-container`);
+  if(!cont) return;
+  const lista=especialesData[tipo];
+  if(!lista.length){ cont.innerHTML='<div class="empty">Sin clases especiales programadas</div>'; return; }
+  cont.innerHTML=lista.map(e=>`
+    <div class="especial-card" onclick="abrirModalEspecial('${tipo}','${e.id}')">
+      <div class="especial-fecha">${formatoFechaCorta(e.fecha)}</div>
+      <div class="especial-info">
+        <div class="especial-nombre">${e.instructor}${tipo==='aerobicos'&&e.disciplina?' · '+e.disciplina:''}</div>
+        <div class="especial-meta">${e.horaIni}–${e.horaFin} · Bs ${e.monto||0}/cliente${e.estado==='realizado'&&e.asistieron!=null?' · '+e.asistieron+' asistieron':''}</div>
+      </div>
+      <span class="estado-badge estado-${e.estado}">${estadoEspecialLabel(e.estado)}</span>
+    </div>`).join('');
+}
+
+window.abrirModalEspecial=function(tipo,id=null){
+  document.getElementById('especial-tipo').value=tipo;
+  document.getElementById('especial-id-edit').value=id||'';
+  document.getElementById('campo-especial-disciplina').style.display=tipo==='aerobicos'?'block':'none';
+  document.getElementById('btn-borrar-especial').style.display=id?'inline-block':'none';
+
+  const e=id?especialesData[tipo].find(x=>x.id===id):null;
+  document.getElementById('especial-fecha').value=e?e.fecha:fechaHoy();
+  document.getElementById('especial-hora-ini').value=e?e.horaIni:'';
+  document.getElementById('especial-hora-fin').value=e?e.horaFin:'';
+  document.getElementById('especial-disciplina').value=e?(e.disciplina||''):'';
+  document.getElementById('especial-instructor').value=e?(e.instructor||''):'';
+  document.getElementById('especial-monto').value=e?(e.monto||''):'';
+  document.getElementById('especial-estado').value=e?(e.estado||'reservado'):'reservado';
+  document.getElementById('especial-asistieron').value=(e&&e.asistieron!=null)?e.asistieron:'';
+  toggleCampoAsistieron();
+  document.getElementById('modal-especial').classList.add('open');
+};
+
+function toggleCampoAsistieron(){
+  const est=document.getElementById('especial-estado').value;
+  document.getElementById('campo-especial-asistieron').style.display=est==='realizado'?'block':'none';
+}
+document.getElementById('especial-estado')?.addEventListener('change',toggleCampoAsistieron);
+
+window.guardarEspecial=async function(){
+  const tipo=document.getElementById('especial-tipo').value;
+  const id=document.getElementById('especial-id-edit').value;
+  const fecha=document.getElementById('especial-fecha').value;
+  const horaIni=document.getElementById('especial-hora-ini').value;
+  const horaFin=document.getElementById('especial-hora-fin').value;
+  const disciplina=tipo==='aerobicos'?document.getElementById('especial-disciplina').value.trim():'Spinning';
+  const instructor=document.getElementById('especial-instructor').value.trim();
+  const monto=Number(document.getElementById('especial-monto').value)||0;
+  const estado=document.getElementById('especial-estado').value;
+  const asistieronVal=document.getElementById('especial-asistieron').value;
+  const asistieron=asistieronVal!==''?Number(asistieronVal):null;
+
+  if(!fecha||!horaIni||!horaFin||!instructor){ showToast('Completa los campos obligatorios','err'); return; }
+  showLoading();
+  try{
+    const data={sucursal:currentSuc,tipo,fecha,horaIni,horaFin,disciplina,instructor,monto,estado,asistieron,
+      actualizadoPor:currentUser.name,actualizadoEn:new Date().toISOString()};
+    if(id){
+      await updateDoc(doc(db,'especiales',id),data);
+    } else {
+      data.creadoPor=currentUser.name; data.creadoEn=new Date().toISOString();
+      await setDoc(doc(collection(db,'especiales')),data);
+    }
+    closeModal('modal-especial');
+    showToast('Clase especial guardada');
+    await initClasesPanel(tipo);
+  }catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
+};
+
+window.borrarEspecial=async function(){
+  const tipo=document.getElementById('especial-tipo').value;
+  const id=document.getElementById('especial-id-edit').value;
+  if(!id) return;
+  if(!confirm('¿Eliminar esta clase especial?')) return;
+  showLoading();
+  try{
+    await deleteDoc(doc(db,'especiales',id));
+    closeModal('modal-especial');
+    showToast('Clase especial eliminada');
+    await initClasesPanel(tipo);
+  }catch(e){ showToast('Error al eliminar','err'); }
+  hideLoading();
+};
+
+// ============================================================
+// SESIÓN PERSISTENTE
+// Antes: al actualizar (F5) la página en cualquier pestaña, se
+// perdía la sesión y había que volver a poner usuario/contraseña.
+// Ahora se guarda en este navegador y se restaura solo, quedando
+// en la misma pestaña donde estaba.
+// ============================================================
+const SESSION_KEY = 'gymControlSesion';
+const SESSION_PANEL_KEY = 'gymControlPanelActivo';
+
+function guardarSesion(){
+  try{ localStorage.setItem(SESSION_KEY, JSON.stringify({ user: currentUser, suc: currentSuc })); }catch(e){}
+}
+function borrarSesion(){
+  try{ localStorage.removeItem(SESSION_KEY); localStorage.removeItem(SESSION_PANEL_KEY); }catch(e){}
+}
+function guardarPanelActivo(panelId){
+  try{ localStorage.setItem(SESSION_PANEL_KEY, panelId); }catch(e){}
+}
+
+(async function restaurarSesion(){
+  let guardada = null;
+  try{ guardada = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); }catch(e){}
+  if(!guardada || !guardada.user || !guardada.suc) return;
+  currentUser = guardada.user;
+  currentSuc  = guardada.suc;
+  showLoading();
+  try{
+    await loadDash();
+    const panelGuardado = localStorage.getItem(SESSION_PANEL_KEY);
+    if(panelGuardado){
+      const tabEl = [...document.querySelectorAll('.tab')].find(t=>t.dataset.panel===panelGuardado);
+      if(tabEl) tabEl.click();
+    }
+  }catch(e){ hideLoading(); }
+})();
+
+// ============================================================
+// REINICIO AUTOMÁTICO A MEDIANOCHE
+// El checklist se guarda con la fecha en el id del documento,
+// pero si la pestaña queda abierta toda la noche nadie vuelve a
+// pedirle los datos a Firebase, entonces se ve todo tildado
+// igual que el día anterior. Este chequeo revisa cada minuto si
+// cambió la fecha y, si cambió, vuelve a cargar el checklist
+// (que al ser un día nuevo, sale limpio/sin marcar).
+// ============================================================
+let fechaVigente = fechaHoy();
+setInterval(async ()=>{
+  if(!currentUser) return;
+  const hoy = fechaHoy();
+  if(hoy !== fechaVigente){
+    fechaVigente = hoy;
+    try{
+      await renderChecklist();
+      if(currentUser.role==='recepcionista') renderRevision();
+      showToast('Nuevo día — el checklist se reinició');
+    }catch(e){}
+  }
+}, 60000);

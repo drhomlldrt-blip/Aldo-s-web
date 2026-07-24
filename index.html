@@ -101,10 +101,126 @@
       <div class="section-title">Sin atender en más de 24 horas <span></span></div>
       <div id="alertas-container"><div class="empty">Sin alertas ✓</div></div>
     </div>
+    <div id="panel-aerobicos" class="panel">
+      <div class="clases-toolbar">
+        <div class="clases-switch" id="switch-aerobicos">
+          <button class="clases-switch-btn active" data-vista="horario" onclick="cambiarVistaClases('aerobicos','horario')">Horario semanal</button>
+          <button class="clases-switch-btn" data-vista="especiales" onclick="cambiarVistaClases('aerobicos','especiales')">Clases especiales</button>
+        </div>
+        <button class="btn-asignar" id="btn-nueva-clase-aerobicos" style="display:none" onclick="abrirModalClase('aerobicos')">+ Nueva clase</button>
+        <button class="btn-asignar" id="btn-nueva-especial-aerobicos" style="display:none" onclick="abrirModalEspecial('aerobicos')">+ Programar especial</button>
+      </div>
+      <div id="aerobicos-horario-container"></div>
+      <div id="aerobicos-especiales-container" style="display:none"></div>
+    </div>
+    <div id="panel-spinning" class="panel">
+      <div class="clases-toolbar">
+        <div class="clases-switch" id="switch-spinning">
+          <button class="clases-switch-btn active" data-vista="horario" onclick="cambiarVistaClases('spinning','horario')">Horario semanal</button>
+          <button class="clases-switch-btn" data-vista="especiales" onclick="cambiarVistaClases('spinning','especiales')">Clases especiales</button>
+        </div>
+        <button class="btn-asignar" id="btn-nueva-clase-spinning" style="display:none" onclick="abrirModalClase('spinning')">+ Nueva clase</button>
+        <button class="btn-asignar" id="btn-nueva-especial-spinning" style="display:none" onclick="abrirModalEspecial('spinning')">+ Programar especial</button>
+      </div>
+      <div id="spinning-horario-container"></div>
+      <div id="spinning-especiales-container" style="display:none"></div>
+    </div>
     <div id="panel-admin" class="panel">
       <div class="admin-title">Usuarios de esta sucursal</div>
       <div id="admin-users"></div>
       <button class="add-user-btn" onclick="showAddUserModal()">+ Agregar usuario</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CREAR/EDITAR CLASE (horario semanal) -->
+<div class="modal-overlay" id="modal-clase">
+  <div class="modal">
+    <div class="modal-title" id="modal-clase-titulo">Nueva clase</div>
+    <input type="hidden" id="clase-tipo">
+    <input type="hidden" id="clase-id-edit">
+    <div class="field"><label>Día</label>
+      <select id="clase-dia">
+        <option value="lunes">Lunes</option><option value="martes">Martes</option>
+        <option value="miercoles">Miércoles</option><option value="jueves">Jueves</option>
+        <option value="viernes">Viernes</option><option value="sabado">Sábado</option>
+        <option value="domingo">Domingo</option>
+      </select>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Hora inicio</label><input type="time" id="clase-hora-ini"></div>
+      <div class="field"><label>Hora fin</label><input type="time" id="clase-hora-fin"></div>
+    </div>
+    <div class="field"><label>Instructor</label><input type="text" id="clase-instructor" placeholder="Nombre del instructor"></div>
+    <div class="field" id="campo-disciplina"><label>Disciplina</label><input type="text" id="clase-disciplina" placeholder="Ej: Zumba, Funcional, Baile..."></div>
+    <div class="field-row">
+      <div class="field"><label>Costo por clase (Bs)</label><input type="number" id="clase-costo" placeholder="0"></div>
+      <div class="field"><label>Celular instructor</label><input type="text" id="clase-celular" placeholder="70000000"></div>
+    </div>
+    <div class="field"><label>Fecha de inicio (antigüedad)</label><input type="date" id="clase-fecha-inicio"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-clase')">Cancelar</button>
+      <button class="btn-danger" id="btn-borrar-clase" style="display:none" onclick="borrarClase()">Eliminar</button>
+      <button class="btn-send" onclick="guardarClase()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL REGISTRAR HISTORIAL DEL DÍA -->
+<div class="modal-overlay" id="modal-hist-clase">
+  <div class="modal">
+    <div class="modal-title">Registrar clase de hoy</div>
+    <div class="modal-sub" id="modal-hist-clase-sub"></div>
+    <input type="hidden" id="hist-clase-tipo">
+    <input type="hidden" id="hist-clase-id">
+    <div class="field"><label>Fecha</label><input type="date" id="hist-clase-fecha"></div>
+    <div class="field"><label>Estado</label>
+      <select id="hist-clase-estado" onchange="onCambioEstadoHist()">
+        <option value="dictada">Dictada normalmente</option>
+        <option value="cancelada">Cancelada (menos de 3 clientes a los 15 min)</option>
+        <option value="atraso">Instructor llegó atrasado</option>
+        <option value="ausencia">Ausencia sin previo aviso</option>
+        <option value="reemplazo">Reemplazo (otro instructor la dictó)</option>
+      </select>
+    </div>
+    <div class="field"><label>Número de clientes</label><input type="number" id="hist-clase-clientes" placeholder="0"></div>
+    <div class="field" id="campo-atraso" style="display:none"><label>Minutos de atraso</label><input type="number" id="hist-clase-atraso" placeholder="0"></div>
+    <div class="field" id="campo-reemplazo" style="display:none"><label>Nombre de quien reemplazó</label><input type="text" id="hist-clase-reemplazo" placeholder="Nombre"></div>
+    <div class="field"><label>Observación (opcional)</label><textarea id="hist-clase-obs" placeholder="Detalle adicional..."></textarea></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-hist-clase')">Cancelar</button>
+      <button class="btn-send" onclick="guardarHistClase()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CLASE ESPECIAL -->
+<div class="modal-overlay" id="modal-especial">
+  <div class="modal">
+    <div class="modal-title">Programar clase especial</div>
+    <input type="hidden" id="especial-tipo">
+    <input type="hidden" id="especial-id-edit">
+    <div class="field"><label>Fecha</label><input type="date" id="especial-fecha"></div>
+    <div class="field-row">
+      <div class="field"><label>Hora inicio</label><input type="time" id="especial-hora-ini"></div>
+      <div class="field"><label>Hora fin</label><input type="time" id="especial-hora-fin"></div>
+    </div>
+    <div class="field" id="campo-especial-disciplina"><label>Disciplina</label><input type="text" id="especial-disciplina" placeholder="Ej: Zumba especial"></div>
+    <div class="field"><label>Instructor</label><input type="text" id="especial-instructor" placeholder="Nombre del instructor"></div>
+    <div class="field"><label>Monto por cliente (Bs)</label><input type="number" id="especial-monto" placeholder="0"></div>
+    <div class="field"><label>Estado</label>
+      <select id="especial-estado">
+        <option value="reservado">Reservado</option>
+        <option value="confirmado">Confirmado</option>
+        <option value="realizado">Realizado</option>
+        <option value="cancelado">Cancelado</option>
+      </select>
+    </div>
+    <div class="field" id="campo-especial-asistieron" style="display:none"><label>Clientes que asistieron</label><input type="number" id="especial-asistieron" placeholder="0"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-especial')">Cancelar</button>
+      <button class="btn-danger" id="btn-borrar-especial" style="display:none" onclick="borrarEspecial()">Eliminar</button>
+      <button class="btn-send" onclick="guardarEspecial()">Guardar</button>
     </div>
   </div>
 </div>
