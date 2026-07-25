@@ -41,7 +41,17 @@ let turnoVista      = 'manana'; // turno que está viendo el supervisor
 // ============================================================
 // HELPERS
 // ============================================================
-const fechaHoy  = () => new Date().toISOString().split('T')[0];
+// OJO: toISOString() siempre da la fecha en UTC, no en horario de
+// Bolivia (UTC-4). Eso hacía que el turno noche (18:30-22:30, que
+// cae justo después de que el reloj UTC ya cambió de día) guardara
+// sus tareas con la fecha de "mañana", y por eso se veían tildadas
+// todo el día siguiente. fechaLocal() arma la fecha con los
+// componentes locales del navegador para evitar ese desfase.
+function fechaLocal(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+const fechaHoy  = () => fechaLocal(new Date());
 const mesActual = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
 const horaActual= () => new Date().toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit'});
 const tsAhora   = () => Date.now();
@@ -225,6 +235,34 @@ function getTareasTurno(turno){
   return tareas[turno] || [];
 }
 
+// Calcula cuántos minutos hay entre dos horas "HH:MM"
+function calcularDuracionMin(ini,fin){
+  if(!ini||!fin) return null;
+  const [h1,m1]=ini.split(':').map(Number);
+  const [h2,m2]=fin.split(':').map(Number);
+  if(isNaN(h1)||isNaN(m1)||isNaN(h2)||isNaN(m2)) return null;
+  let mins=(h2*60+m2)-(h1*60+m1);
+  if(mins<0) mins+=24*60;
+  return mins;
+}
+
+// El personal de limpieza tomaba el rango de hora muy literal (dejaban de
+// revisar baños fuera de "su horario"). Por eso ahora se muestran los
+// MINUTOS que debería tomar la tarea como dato principal, y el rango de
+// hora queda solo como guía aproximada de en qué momento del turno va.
+// Los bloques de "Tiempo de imprevistos" no tienen una hora fija real
+// (el horario exacto varía), así que ahí se muestran solo los minutos.
+function formatoBloqueTiempo(bloque){
+  if(bloque.area==='Tiempo de imprevistos'){
+    const m=(bloque.tareas[0]||'').match(/\((\d+)\s*min\)/i);
+    return `<div class="area-dur">~${m?m[1]:'?'} min</div>`;
+  }
+  const [ini,fin]=bloque.hora.split('–');
+  const mins=calcularDuracionMin(ini,fin);
+  if(mins==null) return `<div class="area-hora">${bloque.hora}</div>`;
+  return `<div class="area-dur">~${mins} min</div><div class="area-hora-sec">${bloque.hora} aprox.</div>`;
+}
+
 async function renderChecklist(){
   const cont = document.getElementById('checklist-container');
   if(!cont) return;
@@ -265,7 +303,15 @@ async function renderChecklist(){
 
   const turnoInfo = {manana:'Turno mañana — 07:00 a 11:00',tarde:'Turno tarde — 14:30 a 18:30',noche:'Turno noche — 18:30 a 22:30'};
 
-  let html = selectorHTML + `<div class="section-title">${turnoInfo[turno]||''} <span></span></div>`;
+  const bannerPrioridad = `
+    <div class="prioridad-banner">
+      Los horarios de cada tarea son una <strong>guía aproximada</strong>, no un horario exacto — lo que importa
+      es completar los minutos indicados en cada bloque, siguiendo el orden como referencia.
+      <strong>Baños y vestidores son prioridad</strong>: hay que revisarlos y mantenerlos limpios con frecuencia
+      durante todo el turno (piso mojado, papel higiénico, inodoros sucios), no solo dentro de su bloque de horario.
+    </div>`;
+
+  let html = selectorHTML + bannerPrioridad + `<div class="section-title">${turnoInfo[turno]||''} <span></span></div>`;
 
   lista.forEach(bloque=>{
     const hechas = bloque.tareas.filter((_,i)=>estado[`${bloque.id}_${i}`]?.hecho).length;
@@ -278,7 +324,7 @@ async function renderChecklist(){
       <div class="area-header" onclick="toggleBloque('${bloque.id}')">
         <div style="flex:1">
           <div class="area-name">${bloque.area}</div>
-          <div class="area-hora">${bloque.hora}</div>
+          ${formatoBloqueTiempo(bloque)}
         </div>
         <span class="area-badge ${badgeCls}">${hechas}/${total}</span>
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
@@ -576,7 +622,7 @@ function renderBloquesHistorial(fecha,turno,estado){
       <div class="area-header" onclick="toggleBloque('${uid}')">
         <div style="flex:1">
           <div class="area-name">${bloque.area}</div>
-          <div class="area-hora">${bloque.hora}</div>
+          ${formatoBloqueTiempo(bloque)}
         </div>
         <span class="area-badge ${badgeCls}">${hechas}/${total}</span>
         <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
@@ -610,7 +656,7 @@ async function cargarHistorial(){
     const hoy = fechaHoy();
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate()-6); // ventana de 7 días (hoy + 6 anteriores)
-    const cutoffStr = cutoff.toISOString().split('T')[0];
+    const cutoffStr = fechaLocal(cutoff);
 
     // Puede que la ventana de 7 días cruce de un mes a otro
     const meses = new Set([mesActual(), mesDe(cutoffStr)]);
