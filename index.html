@@ -166,27 +166,82 @@
   </div>
 </div>
 
+<!-- MODAL REPORTE POR INSTRUCTOR -->
+<div class="modal-overlay" id="modal-reporte-instructor">
+  <div class="modal modal-wide">
+    <div class="modal-title">Reporte por instructor</div>
+    <div class="modal-sub">Estadísticas generales de todos sus horarios, sin revisar clase por clase</div>
+    <input type="hidden" id="rep-tipo">
+    <div class="field-row">
+      <div class="field"><label>Instructor</label><select id="rep-instructor"></select></div>
+      <div class="field"><label>Período</label>
+        <select id="rep-periodo">
+          <option value="mes">Este mes</option>
+          <option value="3m">Últimos 3 meses</option>
+          <option value="todo">Todo el historial</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn-send" style="width:100%;margin-bottom:6px" onclick="generarReporteInstructor()">Generar reporte</button>
+    <div id="rep-instructor-resultado"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-reporte-instructor')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL REGISTRAR HISTORIAL DEL DÍA -->
 <div class="modal-overlay" id="modal-hist-clase">
   <div class="modal">
-    <div class="modal-title">Registrar clase de hoy</div>
+    <div class="modal-title">Registro de clase</div>
     <div class="modal-sub" id="modal-hist-clase-sub"></div>
     <input type="hidden" id="hist-clase-tipo">
     <input type="hidden" id="hist-clase-id">
     <div class="field"><label>Fecha</label><input type="date" id="hist-clase-fecha"></div>
     <div class="field"><label>Estado</label>
       <select id="hist-clase-estado" onchange="onCambioEstadoHist()">
-        <option value="dictada">Dictada normalmente</option>
-        <option value="cancelada">Cancelada (menos de 3 clientes a los 15 min)</option>
-        <option value="atraso">Instructor llegó atrasado</option>
-        <option value="ausencia">Ausencia sin previo aviso</option>
-        <option value="reemplazo">Reemplazo (otro instructor la dictó)</option>
+        <option value="realizada">Clase realizada</option>
+        <option value="retraso">Clase realizada con retraso</option>
+        <option value="reemplazo">Clase realizada con reemplazo</option>
+        <option value="cancelada">Clase cancelada</option>
       </select>
     </div>
-    <div class="field"><label>Número de clientes</label><input type="number" id="hist-clase-clientes" placeholder="0"></div>
-    <div class="field" id="campo-atraso" style="display:none"><label>Minutos de atraso</label><input type="number" id="hist-clase-atraso" placeholder="0"></div>
-    <div class="field" id="campo-reemplazo" style="display:none"><label>Nombre de quien reemplazó</label><input type="text" id="hist-clase-reemplazo" placeholder="Nombre"></div>
-    <div class="field"><label>Observación (opcional)</label><textarea id="hist-clase-obs" placeholder="Detalle adicional..."></textarea></div>
+
+    <div class="field" id="campo-hist-retraso" style="display:none">
+      <label>Minutos de retraso</label>
+      <input type="number" id="hist-clase-atraso" placeholder="0">
+    </div>
+
+    <div class="field" id="campo-hist-reemplazo" style="display:none">
+      <label>Instructor reemplazante</label>
+      <input type="text" id="hist-clase-reemplazo" placeholder="Nombre">
+    </div>
+    <div class="field" id="campo-hist-gestionado" style="display:none">
+      <label>Reemplazo gestionado por</label>
+      <select id="hist-clase-gestionado">
+        <option value="instructor">El instructor</option>
+        <option value="gimnasio">El gimnasio</option>
+      </select>
+    </div>
+
+    <div class="field" id="campo-hist-motivo" style="display:none">
+      <label>Motivo de cancelación</label>
+      <select id="hist-clase-motivo">
+        <option value="ausencia_sin_aviso">Ausencia sin previo aviso</option>
+        <option value="aviso_previo">Aviso previo del instructor</option>
+        <option value="retraso_mayor">Retraso mayor a 15 minutos</option>
+        <option value="alumnos_insuficientes">Cantidad insuficiente de alumnos</option>
+        <option value="infraestructura">Problemas de infraestructura</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+
+    <div class="field-row">
+      <div class="field"><label>Alumnos al inicio</label><input type="number" id="hist-clase-alum-ini" placeholder="0"></div>
+      <div class="field"><label>Alumnos al final</label><input type="number" id="hist-clase-alum-fin" placeholder="0"></div>
+    </div>
+
+    <div class="field"><label>Observaciones (opcional)</label><textarea id="hist-clase-obs" placeholder="Detalle adicional..."></textarea></div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal('modal-hist-clase')">Cancelar</button>
       <button class="btn-send" onclick="guardarHistClase()">Guardar</button>

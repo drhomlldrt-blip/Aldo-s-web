@@ -844,7 +844,9 @@ function calcularAntiguedad(fechaInicio){
   const anios=Math.floor(meses/12), rest=meses%12;
   return anios>0 ? `${anios}a ${rest}m` : `${rest}m`;
 }
-function estadoHistLabel(e){ return {dictada:'Dictada',cancelada:'Cancelada',atraso:'Atraso',ausencia:'Ausencia',reemplazo:'Reemplazo'}[e]||e; }
+function estadoHistLabel(e){ return {realizada:'Realizada',retraso:'Con retraso',reemplazo:'Con reemplazo',cancelada:'Cancelada'}[e]||e; }
+function motivoCancelLabel(m){ return {ausencia_sin_aviso:'Ausencia sin aviso',aviso_previo:'Aviso previo',retraso_mayor:'Retraso mayor a 15 min',alumnos_insuficientes:'Alumnos insuficientes',infraestructura:'Infraestructura',otro:'Otro'}[m]||m; }
+function gestionadoLabel(g){ return {instructor:'Instructor',gimnasio:'Gimnasio'}[g]||g; }
 function estadoEspecialLabel(e){ return {reservado:'Reservado',confirmado:'Confirmado',realizado:'Realizado',cancelado:'Cancelado'}[e]||e; }
 function formatoFechaCorta(fecha){ if(!fecha) return '—'; const [y,m,d]=fecha.split('-'); return `${d}/${m}`; }
 
@@ -913,6 +915,10 @@ function renderHorarioTipo(tipo){
   }
 
   const lista=clasesData[tipo];
+  const esSup2=currentUser.role==='supervisor';
+  if(esSup2 && lista.length){
+    html+=`<button class="btn-link-report" onclick="abrirReporteInstructor('${tipo}')">📊 Reporte por instructor</button>`;
+  }
   if(!lista.length){
     cont.innerHTML=html+'<div class="empty">Sin clases programadas todavía</div>';
     return;
@@ -959,7 +965,7 @@ function renderSlotCard(tipo,c){
       <div class="slot-hora">${c.horaIni}–${c.horaFin}</div>
       <div class="slot-info">
         <div class="slot-instructor">${c.instructor}</div>
-        <div class="slot-disciplina">${disciplinaTxt}</div>
+        <div class="slot-disciplina">${disciplinaTxt}${c.costo?` · Bs ${c.costo}`:''}</div>
       </div>
       <div class="slot-actions">
         ${esSup?`
@@ -1011,9 +1017,10 @@ function renderHistMini(tipo,claseId){
     <div class="hist-mini-row">
       <span class="hist-mini-fecha">${r.fecha}</span>
       <span class="estado-badge estado-${r.estado}">${estadoHistLabel(r.estado)}</span>
-      <span>${r.clientes!=null?r.clientes+' clientes':''}</span>
-      ${r.estado==='atraso'&&r.atrasoMin?`<span>${r.atrasoMin} min atraso</span>`:''}
-      ${r.estado==='reemplazo'&&r.reemplazoNombre?`<span>Reemplazo: ${r.reemplazoNombre}</span>`:''}
+      ${r.alumnosInicio!=null||r.alumnosFin!=null?`<span>${r.alumnosInicio??'?'}→${r.alumnosFin??'?'} alumnos</span>`:''}
+      ${r.estado==='retraso'&&r.atrasoMin?`<span>${r.atrasoMin} min</span>`:''}
+      ${r.estado==='reemplazo'&&r.reemplazoNombre?`<span>Reemplazo: ${r.reemplazoNombre}${r.reemplazoGestionadoPor?' ('+gestionadoLabel(r.reemplazoGestionadoPor)+')':''}</span>`:''}
+      ${r.estado==='cancelada'&&r.motivoCancelacion?`<span>${motivoCancelLabel(r.motivoCancelacion)}</span>`:''}
     </div>`).join('');
 }
 
@@ -1144,19 +1151,26 @@ window.abrirModalHistClase=function(tipo,claseId){
   document.getElementById('hist-clase-id').value=claseId;
   document.getElementById('modal-hist-clase-sub').textContent=`${diaLabel(c.dia)} ${c.horaIni}–${c.horaFin} · ${c.instructor}`;
   document.getElementById('hist-clase-fecha').value=fechaHoy();
-  document.getElementById('hist-clase-estado').value='dictada';
-  document.getElementById('hist-clase-clientes').value='';
+  document.getElementById('hist-clase-estado').value='realizada';
   document.getElementById('hist-clase-atraso').value='';
   document.getElementById('hist-clase-reemplazo').value='';
+  document.getElementById('hist-clase-gestionado').value='instructor';
+  document.getElementById('hist-clase-motivo').value='ausencia_sin_aviso';
+  document.getElementById('hist-clase-alum-ini').value='';
+  document.getElementById('hist-clase-alum-fin').value='';
   document.getElementById('hist-clase-obs').value='';
   onCambioEstadoHist();
   document.getElementById('modal-hist-clase').classList.add('open');
 };
 
+// El formulario es dinámico: solo se ven los campos que corresponden
+// al estado elegido, para que recepción lo llene rápido y sin ruido.
 window.onCambioEstadoHist=function(){
   const est=document.getElementById('hist-clase-estado').value;
-  document.getElementById('campo-atraso').style.display=est==='atraso'?'block':'none';
-  document.getElementById('campo-reemplazo').style.display=est==='reemplazo'?'block':'none';
+  document.getElementById('campo-hist-retraso').style.display    = est==='retraso'   ?'block':'none';
+  document.getElementById('campo-hist-reemplazo').style.display  = est==='reemplazo' ?'block':'none';
+  document.getElementById('campo-hist-gestionado').style.display = est==='reemplazo' ?'block':'none';
+  document.getElementById('campo-hist-motivo').style.display     = est==='cancelada' ?'block':'none';
 };
 
 window.guardarHistClase=async function(){
@@ -1164,17 +1178,31 @@ window.guardarHistClase=async function(){
   const claseId=document.getElementById('hist-clase-id').value;
   const fecha=document.getElementById('hist-clase-fecha').value||fechaHoy();
   const estado=document.getElementById('hist-clase-estado').value;
-  const clientes=Number(document.getElementById('hist-clase-clientes').value)||0;
   const atrasoMin=Number(document.getElementById('hist-clase-atraso').value)||0;
   const reemplazoNombre=document.getElementById('hist-clase-reemplazo').value.trim();
+  const reemplazoGestionadoPor=document.getElementById('hist-clase-gestionado').value;
+  const motivoCancelacion=document.getElementById('hist-clase-motivo').value;
+  const alumIniVal=document.getElementById('hist-clase-alum-ini').value;
+  const alumFinVal=document.getElementById('hist-clase-alum-fin').value;
+  const alumnosInicio = alumIniVal!==''?Number(alumIniVal):null;
+  const alumnosFin    = alumFinVal!==''?Number(alumFinVal):null;
   const obs=document.getElementById('hist-clase-obs').value.trim();
   if(!claseId) return;
+
+  if(estado==='reemplazo' && !reemplazoNombre){ showToast('Indica el instructor reemplazante','err'); return; }
+
   showLoading();
   try{
+    const c=clasesData[tipo].find(x=>x.id===claseId);
     await setDoc(doc(db,'historial_clases',`${claseId}_${fecha}`),{
-      claseId, sucursal:currentSuc, tipo, fecha, estado, clientes,
-      atrasoMin: estado==='atraso'?atrasoMin:null,
+      claseId, sucursal:currentSuc, tipo, fecha, estado,
+      instructor: c?c.instructor:null, // se guarda plano para poder agrupar por instructor sin hacer join
+      dia: c?c.dia:null, horaIni: c?c.horaIni:null, horaFin: c?c.horaFin:null,
+      atrasoMin: estado==='retraso'?atrasoMin:null,
       reemplazoNombre: estado==='reemplazo'?reemplazoNombre:null,
+      reemplazoGestionadoPor: estado==='reemplazo'?reemplazoGestionadoPor:null,
+      motivoCancelacion: estado==='cancelada'?motivoCancelacion:null,
+      alumnosInicio, alumnosFin,
       obs, registradoPor:currentUser.name, registradoEn:new Date().toISOString(),
     });
     closeModal('modal-hist-clase');
@@ -1183,6 +1211,91 @@ window.guardarHistClase=async function(){
     await cargarHistMiniClase(tipo,claseId);
   }catch(e){ showToast('Error al guardar','err'); }
   hideLoading();
+};
+
+// ------------------------------------------------------------
+// REPORTE POR INSTRUCTOR
+// Junta todos los registros de historial_clases de un instructor
+// (sin importar en cuántos horarios distintos dé clase) para sacar
+// estadísticas generales: puntualidad, cancelaciones, reemplazos y
+// asistencia promedio, en vez de tener que revisar clase por clase.
+// ------------------------------------------------------------
+window.abrirReporteInstructor=function(tipo){
+  document.getElementById('rep-tipo').value=tipo;
+  const instructores=[...new Set(clasesData[tipo].map(c=>c.instructor))].sort();
+  document.getElementById('rep-instructor').innerHTML=instructores.map(i=>`<option value="${i}">${i}</option>`).join('');
+  document.getElementById('rep-instructor-resultado').innerHTML='';
+  document.getElementById('modal-reporte-instructor').classList.add('open');
+};
+
+function fechaDesdePeriodo(periodo){
+  if(periodo==='todo') return null;
+  const meses = periodo==='mes' ? 1 : 3;
+  const d=new Date();
+  d.setMonth(d.getMonth()-meses);
+  return fechaLocal(d);
+}
+
+window.generarReporteInstructor=async function(){
+  const tipo=document.getElementById('rep-tipo').value;
+  const instructor=document.getElementById('rep-instructor').value;
+  const periodo=document.getElementById('rep-periodo').value;
+  const cont=document.getElementById('rep-instructor-resultado');
+  if(!instructor) return;
+  cont.innerHTML='<div class="empty" style="padding:12px 0">Cargando...</div>';
+  try{
+    const q=query(collection(db,'historial_clases'),where('sucursal','==',currentSuc),where('tipo','==',tipo),where('instructor','==',instructor));
+    const snap=await getDocs(q);
+    const desde=fechaDesdePeriodo(periodo);
+    let regs=snap.docs.map(d=>d.data());
+    if(desde) regs=regs.filter(r=>r.fecha>=desde);
+
+    if(!regs.length){ cont.innerHTML='<div class="empty" style="padding:12px 0">Sin registros en este período</div>'; return; }
+
+    const total=regs.length;
+    const porEstado={realizada:0,retraso:0,reemplazo:0,cancelada:0};
+    regs.forEach(r=>{ if(porEstado[r.estado]!=null) porEstado[r.estado]++; });
+    const dictadas = porEstado.realizada+porEstado.retraso+porEstado.reemplazo;
+    const puntualidad = dictadas ? Math.round(porEstado.realizada/dictadas*100) : 0;
+    const pctCancel = Math.round(porEstado.cancelada/total*100);
+
+    const asistencias=regs.filter(r=>r.alumnosFin!=null).map(r=>r.alumnosFin);
+    const promAsist = asistencias.length ? (asistencias.reduce((a,b)=>a+b,0)/asistencias.length).toFixed(1) : '—';
+
+    const motivos={};
+    regs.filter(r=>r.estado==='cancelada').forEach(r=>{
+      const m=r.motivoCancelacion||'otro';
+      motivos[m]=(motivos[m]||0)+1;
+    });
+
+    // Desglose por horario (día + hora), porque el mismo instructor
+    // puede tener varios bloques distintos en la semana
+    const porHorario={};
+    regs.forEach(r=>{
+      const key=`${diaLabel(r.dia)} ${r.horaIni||''}–${r.horaFin||''}`;
+      porHorario[key]=(porHorario[key]||0)+1;
+    });
+
+    cont.innerHTML=`
+      <div class="rep-stats-grid">
+        <div class="rep-stat-card"><div class="rep-stat-num">${total}</div><div class="rep-stat-label">Clases registradas</div></div>
+        <div class="rep-stat-card"><div class="rep-stat-num">${puntualidad}%</div><div class="rep-stat-label">Puntualidad</div></div>
+        <div class="rep-stat-card"><div class="rep-stat-num">${pctCancel}%</div><div class="rep-stat-label">Canceladas</div></div>
+        <div class="rep-stat-card"><div class="rep-stat-num">${promAsist}</div><div class="rep-stat-label">Asistencia promedio</div></div>
+      </div>
+      <div class="rep-section-title">Detalle</div>
+      <div class="rep-motivo-row"><span>Realizadas normalmente</span><strong>${porEstado.realizada}</strong></div>
+      <div class="rep-motivo-row"><span>Realizadas con retraso</span><strong>${porEstado.retraso}</strong></div>
+      <div class="rep-motivo-row"><span>Realizadas con reemplazo</span><strong>${porEstado.reemplazo}</strong></div>
+      <div class="rep-motivo-row"><span>Canceladas</span><strong>${porEstado.cancelada}</strong></div>
+      ${Object.keys(motivos).length?`
+        <div class="rep-section-title">Motivos de cancelación</div>
+        ${Object.entries(motivos).map(([m,n])=>`<div class="rep-motivo-row"><span>${motivoCancelLabel(m)}</span><strong>${n}</strong></div>`).join('')}
+      `:''}
+      <div class="rep-section-title">Por horario</div>
+      ${Object.entries(porHorario).map(([h,n])=>`<div class="rep-horario-row"><span>${h}</span><strong>${n} registro${n>1?'s':''}</strong></div>`).join('')}
+    `;
+  }catch(e){ cont.innerHTML='<div class="empty" style="padding:12px 0">Error al cargar el reporte</div>'; }
 };
 
 // ------------------------------------------------------------

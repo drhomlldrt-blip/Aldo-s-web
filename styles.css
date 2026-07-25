@@ -373,6 +373,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   border-radius:14px;padding:28px;width:100%;max-width:380px;
   max-height:90vh;overflow-y:auto;position:relative;
 }
+.modal-wide{max-width:520px}
 .modal::before{
   content:'';position:absolute;top:0;left:0;right:0;height:2px;
   background:linear-gradient(90deg,var(--neon),var(--neon2));border-radius:14px 14px 0 0;
@@ -493,8 +494,10 @@ textarea:focus{border-color:var(--neon)}
   font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.3px;
 }
 .estado-dictada{background:rgba(184,244,0,.15);color:var(--neon)}
+.estado-realizada{background:rgba(184,244,0,.15);color:var(--neon)}
 .estado-cancelada{background:rgba(255,90,90,.15);color:#ff5a5a}
 .estado-atraso{background:rgba(255,180,60,.15);color:#ffb43c}
+.estado-retraso{background:rgba(255,180,60,.15);color:#ffb43c}
 .estado-ausencia{background:rgba(255,90,90,.15);color:#ff5a5a}
 .estado-reservado{background:rgba(120,170,255,.15);color:#78aaff}
 .estado-confirmado{background:rgba(184,244,0,.15);color:var(--neon)}
@@ -532,6 +535,23 @@ textarea:focus{border-color:var(--neon)}
 .btn-mini-ok{background:var(--neon);color:#0d0d0d}
 .btn-mini-no{background:transparent;border:1px solid var(--border2);color:var(--text2)}
 .btn-mini-no:hover{border-color:var(--danger);color:var(--danger)}
+
+.btn-link-report{
+  display:inline-flex;align-items:center;gap:6px;background:none;border:1px solid var(--border2);
+  color:var(--text2);font-size:12px;padding:8px 14px;border-radius:8px;cursor:pointer;
+  font-family:inherit;margin-bottom:14px;
+}
+.btn-link-report:hover{border-color:var(--neon);color:var(--neon)}
+
+.rep-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.rep-stat-card{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:12px 14px}
+.rep-stat-num{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--neon)}
+.rep-stat-label{font-size:10px;color:var(--gray);letter-spacing:.5px;text-transform:uppercase;margin-top:2px}
+.rep-section-title{font-size:11px;font-weight:700;color:var(--gray);letter-spacing:.5px;text-transform:uppercase;margin:16px 0 8px}
+.rep-motivo-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);padding:4px 0;border-top:1px solid var(--border)}
+.rep-motivo-row:first-child{border-top:none}
+.rep-horario-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);padding:6px 0;border-top:1px solid var(--border)}
+.rep-horario-row:first-child{border-top:none}
 
 /* ===================== RESPONSIVE ===================== */
 @media(max-width:440px){
