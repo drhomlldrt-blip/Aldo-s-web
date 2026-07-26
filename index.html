@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260725b">
+<link rel="stylesheet" href="styles.css?v=20260726a">
 </head>
 <body>
 
@@ -289,6 +289,7 @@
     <div class="field"><label>Prioridad</label>
       <select id="modal-prio-rev"><option value="normal">Normal</option><option value="media">Media</option><option value="alta">Alta — urgente</option></select>
     </div>
+    <div class="field"><label>Foto (opcional)</label><input type="file" id="modal-foto-rev" accept="image/*" capture="environment"></div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal('modal-revision')">Cancelar</button>
       <button class="btn-send" onclick="enviarReporteArea()">Enviar reporte</button>
@@ -336,6 +337,6 @@
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20260725b"></script>
+<script type="module" src="app.js?v=20260726a"></script>
 </body>
 </html>

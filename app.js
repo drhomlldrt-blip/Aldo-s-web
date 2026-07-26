@@ -198,8 +198,12 @@ async function loadDash(){
   tabs.forEach((t,i)=>{
     const el=document.createElement('div');
     el.className='tab'+(i===0?' active':'');
-    el.textContent=t.label;
     el.dataset.panel=t.id;
+    if(t.id==='panel-reportes' && currentUser.role==='limpieza'){
+      el.innerHTML = `${t.label} <span class="tab-badge" id="tab-badge-reportes" style="display:none">0</span>`;
+    } else {
+      el.textContent=t.label;
+    }
     el.onclick=()=>{
       document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
       el.classList.add('active');
@@ -404,64 +408,147 @@ window.marcarTarea = async function(bloqueId,i,hecho,docId,turno){
 // ============================================================
 // REVISIÓN DE ÁREAS — RECEPCIONISTA
 // ============================================================
-function renderRevision(){
+// Antes la recepcionista solo revisaba una lista corta y fija de áreas
+// ("lo básico"), y la marca de "bien" no quedaba visible para nadie más.
+// Ahora la lista de áreas a revisar sale de TODAS las áreas reales del
+// checklist de limpieza de esa sucursal (casi todo lo que se limpia), y
+// cada marca queda guardada por día con 3 niveles (bien/regular/falta),
+// visible para quien vuelva a entrar ese mismo día.
+function slugArea(nombre){
+  return nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+}
+
+function getAreasParaRevision(){
+  const tareas = TAREAS_POR_SUCURSAL[currentSuc];
+  if(!tareas) return [];
+  const set = new Set();
+  ['manana','tarde','noche'].forEach(turno=>{
+    (tareas[turno]||[]).forEach(b=>{
+      if(b.area && b.area!=='Tiempo de imprevistos') set.add(b.area);
+    });
+  });
+  return [...set].sort();
+}
+
+async function renderRevision(){
   const cont=document.getElementById('revision-container');
   if(!cont) return;
-  const areas = AREAS_POR_SUCURSAL[currentSuc] || [];
+  const areas = getAreasParaRevision();
   if(!areas.length){ cont.innerHTML='<div class="empty">Sin áreas configuradas para esta sucursal</div>'; return; }
-  cont.innerHTML = areas.map(area=>`
+
+  const hoy = fechaHoy();
+  const hoyMap = {};
+  try{
+    const q=query(collection(db,'revisiones'),where('sucursal','==',currentSuc),where('fecha','==',hoy));
+    const snap=await getDocs(q);
+    snap.docs.forEach(d=>{ hoyMap[d.data().areaId]=d.data(); });
+  }catch(e){}
+
+  const nivelLabel={bien:'✓ Bien',regular:'◐ Regular',falta:'⚠ Falta atención'};
+  const nivelCls  ={bien:'niv-bien',regular:'niv-regular',falta:'niv-falta'};
+
+  cont.innerHTML = areas.map(nombre=>{
+    const areaId=slugArea(nombre);
+    const nombreEsc=nombre.replace(/'/g,"\\'");
+    const marca=hoyMap[areaId];
+    return `
     <div class="area-block">
       <div class="area-header-rev">
-        <div class="area-name">${area.nombre}</div>
+        <div style="flex:1;min-width:180px">
+          <div class="area-name">${nombre}</div>
+          ${marca
+            ? `<div class="rev-marca ${nivelCls[marca.nivel]}">${nivelLabel[marca.nivel]} · ${marca.hora} — ${marca.registradoPor}</div>`
+            : `<div class="rev-marca rev-pendiente">Sin revisar hoy</div>`}
+        </div>
         <div class="rev-btns">
-          <button class="btn-rev btn-bien" onclick="reportarAreaBien('${area.id}','${area.nombre}')">✓ Bien</button>
-          <button class="btn-rev btn-falta" onclick="abrirReporteArea('${area.id}','${area.nombre}')">⚠ Falta atención</button>
+          <button class="btn-rev btn-bien" onclick="marcarRevision('${areaId}','${nombreEsc}','bien')">✓ Bien</button>
+          <button class="btn-rev btn-regular" onclick="abrirReporteArea('${areaId}','${nombreEsc}','regular')">◐ Regular</button>
+          <button class="btn-rev btn-falta" onclick="abrirReporteArea('${areaId}','${nombreEsc}','falta')">⚠ Falta atención</button>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 let reporteAreaActual=null;
 
-window.abrirReporteArea=function(areaId,areaNombre){
-  reporteAreaActual={id:areaId,nombre:areaNombre};
-  document.getElementById('modal-area-nombre').textContent=areaNombre;
-  document.getElementById('modal-desc-rev').value='';
-  document.getElementById('modal-prio-rev').value='normal';
-  document.getElementById('modal-revision').classList.add('open');
-};
-
-window.reportarAreaBien=async function(areaId,areaNombre){
+window.marcarRevision=async function(areaId,areaNombre,nivel){
   showLoading();
-  try {
-    await setDoc(doc(collection(db,'reportes')),{
-      areaId, area:areaNombre, estado:'bien', nivelRevision:'bien',
-      desc:'Área en buen estado', sucursal:currentSuc,
-      fecha:fechaHoy(), mes:mesActual(), creadoPor:currentUser.name,
-      rol:'recepcionista', timestamp:tsAhora(),
+  try{
+    const hoy=fechaHoy();
+    await setDoc(doc(db,'revisiones',`${currentSuc}_${areaId}_${hoy}`),{
+      sucursal:currentSuc, areaId, area:areaNombre, fecha:hoy, nivel,
+      registradoPor:currentUser.name, hora:horaActual(), registradoEn:new Date().toISOString(),
     });
     showToast(`${areaNombre} — marcada como bien ✓`);
-    await cargarReportes();
+    await renderRevision();
   } catch(e){ showToast('Error','err'); }
   hideLoading();
 };
+
+window.abrirReporteArea=function(areaId,areaNombre,nivel){
+  reporteAreaActual={id:areaId,nombre:areaNombre,nivel:nivel||'falta'};
+  document.getElementById('modal-area-nombre').textContent=areaNombre;
+  document.getElementById('modal-desc-rev').value='';
+  document.getElementById('modal-prio-rev').value= reporteAreaActual.nivel==='falta' ? 'alta' : 'normal';
+  document.getElementById('modal-foto-rev').value='';
+  document.getElementById('modal-revision').classList.add('open');
+};
+
+// Comprime la foto en el navegador antes de guardarla (los reportes se
+// guardan en Firestore, que no acepta archivos grandes)
+function comprimirImagen(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const maxW=800;
+        const scale=Math.min(1, maxW/img.width);
+        const canvas=document.createElement('canvas');
+        canvas.width=Math.round(img.width*scale);
+        canvas.height=Math.round(img.height*scale);
+        canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL('image/jpeg',0.6));
+      };
+      img.onerror=reject;
+      img.src=e.target.result;
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 window.enviarReporteArea=async function(){
   if(!reporteAreaActual) return;
   const desc=document.getElementById('modal-desc-rev').value.trim();
   const prio=document.getElementById('modal-prio-rev').value;
+  const fotoInput=document.getElementById('modal-foto-rev');
   showLoading();
   try {
+    let foto=null;
+    if(fotoInput.files && fotoInput.files[0]){
+      try{ foto=await comprimirImagen(fotoInput.files[0]); }catch(e){}
+    }
+    const hoy=fechaHoy();
+    await setDoc(doc(db,'revisiones',`${currentSuc}_${reporteAreaActual.id}_${hoy}`),{
+      sucursal:currentSuc, areaId:reporteAreaActual.id, area:reporteAreaActual.nombre,
+      fecha:hoy, nivel:reporteAreaActual.nivel, registradoPor:currentUser.name,
+      hora:horaActual(), registradoEn:new Date().toISOString(),
+    });
     await setDoc(doc(collection(db,'reportes')),{
       areaId:reporteAreaActual.id, area:reporteAreaActual.nombre,
-      estado:'pendiente', nivelRevision:'falta', prio,
-      desc:desc||'Requiere atención', sucursal:currentSuc,
-      fecha:fechaHoy(), mes:mesActual(), creadoPor:currentUser.name,
+      estado:'pendiente', nivelRevision:reporteAreaActual.nivel, prio,
+      desc:desc||(reporteAreaActual.nivel==='regular'?'Revisión: estado regular':'Requiere atención'),
+      sucursal:currentSuc, fecha:hoy, mes:mesActual(), creadoPor:currentUser.name,
       rol:'recepcionista', timestamp:tsAhora(),
       alertaEn: tsAhora()+(24*60*60*1000),
+      foto,
     });
     closeModal('modal-revision');
     showToast('Reporte enviado al personal de limpieza');
+    await renderRevision();
     await cargarReportes();
   } catch(e){ showToast('Error','err'); }
   hideLoading();
@@ -512,6 +599,19 @@ async function cargarReportes(){
       .sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
   } catch(e){ reportes=[]; }
   renderReportes();
+  actualizarBadgeReportes();
+}
+
+// Notificación visible para el personal de limpieza: un número en la
+// pestaña "Reportes a atender" cuando tienen reportes pendientes, para
+// que no dependan de entrar a mirar si hay algo nuevo.
+function actualizarBadgeReportes(){
+  if(currentUser.role!=='limpieza') return;
+  const badge=document.getElementById('tab-badge-reportes');
+  if(!badge) return;
+  const pendientes=reportes.filter(r=>r.estado!=='atendido').length;
+  if(pendientes>0){ badge.textContent=pendientes; badge.style.display='inline-flex'; }
+  else badge.style.display='none';
 }
 
 function renderReportes(){
@@ -523,8 +623,8 @@ function renderReportes(){
   if(!lista.length){ cont.innerHTML='<div class="empty">Sin reportes activos</div>'; return; }
 
   const ahora=tsAhora();
-  const estadoMap={pendiente:'s-pend',atendido:'s-done',alerta:'s-alerta'};
-  const estadoLabel={pendiente:'Pendiente',atendido:'Atendido ✓',alerta:'⚠ Sin atender'};
+  const estadoMap={pendiente:'s-pend',atendido:'s-done',alerta:'s-alerta',diferido:'s-diferido'};
+  const estadoLabel={pendiente:'Pendiente',atendido:'Atendido ✓',alerta:'⚠ Sin atender',diferido:'Diferido 24h'};
   const prioMap={alta:'prio-alta',media:'prio-media'};
 
   cont.innerHTML=lista.map(r=>{
@@ -539,22 +639,46 @@ function renderReportes(){
           <div class="report-area">${r.area}</div>
           <div class="report-fecha">${r.fecha} · por ${r.creadoPor}</div>
         </div>
-        <span class="status-pill ${estadoMap[estadoReal]}">${estadoLabel[estadoReal]}</span>
+        <span class="status-pill ${estadoMap[estadoReal]||'s-pend'}">${estadoLabel[estadoReal]||estadoReal}</span>
       </div>
       ${r.desc?`<div class="report-desc">${r.desc}</div>`:''}
+      ${r.foto?`<img src="${r.foto}" class="report-foto" onclick="verFotoGrande('${r.id}')">`:''}
       ${enAlerta?`<div class="alerta-msg">⚠ No fue atendido en 24 horas</div>`:''}
       ${r.estado==='atendido'?`<div class="check-meta">Atendido por ${r.atendidoPor} a las ${r.atendidoEn}</div>`:''}
       <div class="report-actions">
         ${canAtender&&r.estado!=='atendido'?`<button class="btn-sm btn-atend" onclick="atenderReporte('${r.id}')">✓ Marcar atendido</button>`:''}
         ${canPrio&&r.estado!=='atendido'?`
           <button class="btn-sm btn-prio" onclick="cambiarPrio('${r.id}','alta')">🔴 Urgente</button>
-          <button class="btn-sm btn-defer" onclick="cambiarPrio('${r.id}','diferido')">Diferir</button>`:''}
+          <button class="btn-sm btn-defer" onclick="diferirReporte('${r.id}')" title="Pospone la alerta de 24 horas, sin borrar el reporte">Diferir 24h</button>`:''}
         ${currentUser.role==='recepcionista'&&r.estado!=='atendido'&&!enAlerta?`
           <button class="btn-sm btn-noatend" onclick="reportarNoAtendido('${r.id}')">No fue atendido</button>`:''}
       </div>
     </div>`;
   }).join('');
 }
+
+window.verFotoGrande=function(id){
+  const r=reportes.find(x=>x.id===id);
+  if(r && r.foto) window.open(r.foto,'_blank');
+};
+
+// Antes "Diferir" solo cambiaba un campo interno (prio) que no se usaba
+// en ningún lado — no tenía ningún efecto visible ni real. Ahora sí:
+// pospone la alerta de "no atendido" 24 horas más y lo marca con un
+// estado visible ("Diferido 24h"), sin perder el reporte de vista.
+window.diferirReporte=async function(id){
+  showLoading();
+  try {
+    await updateDoc(doc(db,'reportes',id),{
+      estado:'diferido', prio:'diferido',
+      alertaEn: tsAhora()+(24*60*60*1000),
+      diferidoPor:currentUser.name, diferidoEn:horaActual(),
+    });
+    await cargarReportes();
+    showToast('Reporte diferido — se pospuso 24 horas');
+  } catch(e){ showToast('Error','err'); }
+  hideLoading();
+};
 
 window.atenderReporte=async function(id){
   showLoading();
@@ -1447,6 +1571,9 @@ setInterval(async ()=>{
       showToast('Nuevo día — el checklist se reinició');
     }catch(e){}
   }
+  if(currentUser.role==='limpieza'){
+    try{ await cargarReportes(); }catch(e){}
+  }
 }, 60000);
 
 // ============================================================
@@ -1458,7 +1585,7 @@ setInterval(async ()=>{
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260725c';
+const APP_VERSION = '20260726a';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
