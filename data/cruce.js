@@ -17,7 +17,7 @@ export const TAREAS_MANANA = [
     tareas: [
       "Verificar agua caliente en duchas, si hay papel en los baños y si hay jabón líquido en el dispensador",
       "Limpiar lavamanos",
-      "Limpiar espejos de área de baños",
+      "Limpiar espejos  (área de baños)",
       "Limpiar urinarios",
       "Limpiar inodoros",
       "Limpiar tapas de basureros de área de baños",
