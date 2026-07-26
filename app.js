@@ -1448,3 +1448,21 @@ setInterval(async ()=>{
     }catch(e){}
   }
 }, 60000);
+
+// ============================================================
+// AUTO-ACTUALIZACIÓN
+// Antes: si alguien dejaba la pestaña abierta varios días, el
+// navegador nunca volvía a pedir una copia nueva de app.js aunque
+// yo subiera una corrección — se quedaba corriendo el código
+// viejo indefinidamente. Esto revisa cada pocos minutos si ya hay
+// una versión más nueva publicada y, si la hay, recarga la
+// página sola, sin que nadie tenga que hacer nada.
+// ============================================================
+const APP_VERSION = '20260725c';
+setInterval(async ()=>{
+  try{
+    const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
+    const data = await r.json();
+    if(data.version && data.version !== APP_VERSION) location.reload();
+  }catch(e){}
+}, 180000); // cada 3 minutos
