@@ -1651,7 +1651,7 @@ setInterval(async ()=>{
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260727b';
+const APP_VERSION = '20260727c';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
