@@ -408,27 +408,23 @@ window.marcarTarea = async function(bloqueId,i,hecho,docId,turno){
 // ============================================================
 // REVISIÓN DE ÁREAS — RECEPCIONISTA
 // ============================================================
-// Antes la recepcionista solo revisaba una lista corta y fija de áreas
-// ("lo básico"), y la marca de "bien" no quedaba visible para nadie más.
-// Ahora la lista de áreas a revisar sale de TODAS las áreas reales del
-// checklist de limpieza de esa sucursal (casi todo lo que se limpia), y
-// cada marca queda guardada por día con 3 niveles (bien/regular/falta),
-// visible para quien vuelva a entrar ese mismo día.
+// Antes la lista de áreas a revisar salía de TODAS las áreas del
+// checklist de limpieza (quedaba distinta por sucursal y con demasiados
+// ítems). Ahora es una lista simple y fija, igual en las 5 sucursales,
+// para que sea rápida de usar desde recepción.
+const AREAS_REVISION_GENERAL = [
+  'Baños', 'Duchas', 'Vestidores', 'Casilleros', 'Máquinas',
+  'Equipos de cardio', 'Sala de aeróbicos', 'Sala de spinning',
+  'Sala de pesas', 'Otros',
+];
+
 function slugArea(nombre){
   return nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
 }
 
 function getAreasParaRevision(){
-  const tareas = TAREAS_POR_SUCURSAL[currentSuc];
-  if(!tareas) return [];
-  const set = new Set();
-  ['manana','tarde','noche'].forEach(turno=>{
-    (tareas[turno]||[]).forEach(b=>{
-      if(b.area && b.area!=='Tiempo de imprevistos') set.add(b.area);
-    });
-  });
-  return [...set].sort();
+  return AREAS_REVISION_GENERAL;
 }
 
 async function renderRevision(){
@@ -487,12 +483,14 @@ window.marcarRevision=async function(areaId,areaNombre,nivel){
   hideLoading();
 };
 
+let fotoRevActual=null; // dataURL ya comprimida, lista para guardar
+
 window.abrirReporteArea=function(areaId,areaNombre,nivel){
   reporteAreaActual={id:areaId,nombre:areaNombre,nivel:nivel||'falta'};
   document.getElementById('modal-area-nombre').textContent=areaNombre;
   document.getElementById('modal-desc-rev').value='';
   document.getElementById('modal-prio-rev').value= reporteAreaActual.nivel==='falta' ? 'alta' : 'normal';
-  document.getElementById('modal-foto-rev').value='';
+  quitarFotoRev();
   document.getElementById('modal-revision').classList.add('open');
 };
 
@@ -520,17 +518,32 @@ function comprimirImagen(file){
   });
 }
 
+// Se dispara al elegir una foto, sea con el botón "Tomar foto" (cámara)
+// o "Galería" — ambos botones usan esta misma función.
+window.previewFotoRev=async function(input){
+  if(!input.files || !input.files[0]) return;
+  try{
+    fotoRevActual = await comprimirImagen(input.files[0]);
+    document.getElementById('foto-preview-img').src=fotoRevActual;
+    document.getElementById('foto-preview-rev').style.display='block';
+  }catch(e){ showToast('No se pudo cargar la foto','err'); }
+};
+
+window.quitarFotoRev=function(){
+  fotoRevActual=null;
+  const prev=document.getElementById('foto-preview-rev');
+  if(prev) prev.style.display='none';
+  const cam=document.getElementById('modal-foto-camara'); if(cam) cam.value='';
+  const gal=document.getElementById('modal-foto-galeria'); if(gal) gal.value='';
+};
+
 window.enviarReporteArea=async function(){
   if(!reporteAreaActual) return;
   const desc=document.getElementById('modal-desc-rev').value.trim();
   const prio=document.getElementById('modal-prio-rev').value;
-  const fotoInput=document.getElementById('modal-foto-rev');
   showLoading();
   try {
-    let foto=null;
-    if(fotoInput.files && fotoInput.files[0]){
-      try{ foto=await comprimirImagen(fotoInput.files[0]); }catch(e){}
-    }
+    const foto=fotoRevActual||null;
     const hoy=fechaHoy();
     await setDoc(doc(db,'revisiones',`${currentSuc}_${reporteAreaActual.id}_${hoy}`),{
       sucursal:currentSuc, areaId:reporteAreaActual.id, area:reporteAreaActual.nombre,
@@ -1585,7 +1598,7 @@ setInterval(async ()=>{
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260726a';
+const APP_VERSION = '20260726b';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
