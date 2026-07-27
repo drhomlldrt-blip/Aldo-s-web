@@ -170,6 +170,7 @@ async function loadDash(){
     tabs=[
       {id:'panel-checklist', label:'Checklist'},
       {id:'panel-reportes',  label:'Reportes'},
+      {id:'panel-revision',  label:'Revisión áreas'},
       {id:'panel-historial', label:'Historial'},
       {id:'panel-aerobicos', label:'Aeróbicos'},
       {id:'panel-spinning',  label:'Spinning'},
@@ -211,6 +212,7 @@ async function loadDash(){
       document.getElementById(t.id).classList.add('active');
       guardarPanelActivo(t.id);
       if(t.id==='panel-historial')  cargarHistorial();
+      if(t.id==='panel-revision')   renderRevision();
       if(t.id==='panel-alertas')    cargarAlertas();
       if(t.id==='panel-admin')      cargarUsuarios();
       if(t.id==='panel-aerobicos')  initClasesPanel('aerobicos');
@@ -432,6 +434,7 @@ async function renderRevision(){
   if(!cont) return;
   const areas = getAreasParaRevision();
   if(!areas.length){ cont.innerHTML='<div class="empty">Sin áreas configuradas para esta sucursal</div>'; return; }
+  const esSup = currentUser.role==='supervisor';
 
   const hoy = fechaHoy();
   const hoyMap = {};
@@ -443,6 +446,27 @@ async function renderRevision(){
 
   const nivelLabel={bien:'✓ Bien',regular:'◐ Regular',falta:'⚠ Falta atención'};
   const nivelCls  ={bien:'niv-bien',regular:'niv-regular',falta:'niv-falta'};
+
+  if(esSup){
+    const revisadas=Object.keys(hoyMap).length;
+    cont.innerHTML = `<div class="rev-resumen-sup">Hoy se revisaron <strong>${revisadas}</strong> de <strong>${areas.length}</strong> áreas</div>` +
+    areas.map(nombre=>{
+      const areaId=slugArea(nombre);
+      const marca=hoyMap[areaId];
+      return `
+      <div class="area-block">
+        <div class="area-header-rev">
+          <div style="flex:1;min-width:180px">
+            <div class="area-name">${nombre}</div>
+            ${marca
+              ? `<div class="rev-marca ${nivelCls[marca.nivel]}">${nivelLabel[marca.nivel]} · ${marca.hora} — reportado por ${marca.registradoPor}</div>`
+              : `<div class="rev-marca rev-pendiente">Todavía no la revisó nadie hoy</div>`}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    return;
+  }
 
   cont.innerHTML = areas.map(nombre=>{
     const areaId=slugArea(nombre);
@@ -1598,7 +1622,7 @@ setInterval(async ()=>{
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260726b';
+const APP_VERSION = '20260726c';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});

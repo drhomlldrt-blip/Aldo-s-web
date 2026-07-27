@@ -268,6 +268,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .rev-marca.niv-falta{color:var(--warn)}
 .rev-marca.rev-pendiente{color:var(--gray2);font-weight:400}
 
+.rev-resumen-sup{
+  font-size:12.5px;color:var(--text2);background:var(--surface2);
+  border:1px solid var(--border2);border-radius:8px;padding:10px 14px;margin-bottom:14px;
+}
+.rev-resumen-sup strong{color:var(--neon)}
+
 .report-foto{max-width:100%;max-height:180px;border-radius:8px;margin:8px 0;cursor:pointer;display:block;border:1px solid var(--border2)}
 
 .foto-btns{display:flex;gap:8px}
