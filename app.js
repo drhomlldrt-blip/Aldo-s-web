@@ -311,25 +311,30 @@ async function renderChecklist(){
 
   const bannerPrioridad = `
     <div class="prioridad-banner">
-      Los horarios de cada tarea son una <strong>guía aproximada</strong>, no un horario exacto — lo que importa
-      es completar los minutos indicados en cada bloque, siguiendo el orden como referencia.
-      <strong>Baños y vestidores son prioridad</strong>: hay que revisarlos y mantenerlos limpios con frecuencia
-      durante todo el turno (piso mojado, papel higiénico, inodoros sucios), no solo dentro de su bloque de horario.
+      Los horarios de cada tarea son una <strong>guía aproximada</strong> de realizar.
+      <strong>Los baños son prioridad</strong>: hay que revisarlos y limpiar con frecuencia durante todo el turno,
+      no solo dentro de su bloque de horario.
     </div>`;
 
-  let totalHechas=0, totalTareas=0, bloquesCompletos=0;
+  let totalHechas=0, totalTareas=0, bloquesCompletos=0, totalBloquesReales=0;
   const bloquesHtml = lista.map(bloque=>{
+    const esImprevisto = bloque.area==='Tiempo de imprevistos';
     const hechas = bloque.tareas.filter((_,i)=>estado[`${bloque.id}_${i}`]?.hecho).length;
     const total  = bloque.tareas.length;
     const pct    = Math.round(hechas/total*100);
-    const badgeCls = hechas===total?'badge-ok':hechas>0?'badge-pend':'badge-crit';
-    totalHechas+=hechas; totalTareas+=total; if(hechas===total) bloquesCompletos++;
+    const badgeCls = esImprevisto ? 'badge-imprevisto' : (hechas===total?'badge-ok':hechas>0?'badge-pend':'badge-crit');
+    // El tiempo de imprevistos no es un área real para inspeccionar, así
+    // que no cuenta en las estadísticas de avance del turno.
+    if(!esImprevisto){
+      totalHechas+=hechas; totalTareas+=total; if(hechas===total) bloquesCompletos++;
+      totalBloquesReales++;
+    }
 
     return `
-    <div class="area-block">
+    <div class="area-block${esImprevisto?' area-block-imprevisto':''}">
       <div class="area-header" onclick="toggleBloque('${bloque.id}')">
         <div style="flex:1">
-          <div class="area-name">${bloque.area}</div>
+          <div class="area-name">${esImprevisto?'⏱ ':''}${bloque.area}</div>
           ${formatoBloqueTiempo(bloque)}
         </div>
         <span class="area-badge ${badgeCls}">${hechas}/${total}</span>
@@ -377,7 +382,7 @@ async function renderChecklist(){
       </div>
       <div class="stat-card">
         <div class="stat-top"><span class="stat-label">Bloques completos</span><span class="stat-icon info">◔</span></div>
-        <div class="stat-num">${bloquesCompletos}/${lista.length}</div>
+        <div class="stat-num">${bloquesCompletos}/${totalBloquesReales}</div>
         <div class="stat-sub">áreas al 100%</div>
       </div>
     </div>`;
@@ -795,17 +800,18 @@ function renderBloquesHistorial(fecha,turno,estado){
   if(!lista.length) return '<div class="empty" style="padding:6px 0">Sin tareas configuradas</div>';
 
   return lista.map(bloque=>{
+    const esImprevisto = bloque.area==='Tiempo de imprevistos';
     const hechas = bloque.tareas.filter((_,i)=>estado[`${bloque.id}_${i}`]?.hecho).length;
     const total  = bloque.tareas.length;
     const pct    = total ? Math.round(hechas/total*100) : 0;
-    const badgeCls = hechas===total?'badge-ok':hechas>0?'badge-pend':'badge-crit';
+    const badgeCls = esImprevisto ? 'badge-imprevisto' : (hechas===total?'badge-ok':hechas>0?'badge-pend':'badge-crit');
     const uid = `${fecha}_${turno}_${bloque.id}`; // id único por fecha+turno+bloque
 
     return `
-    <div class="area-block">
+    <div class="area-block${esImprevisto?' area-block-imprevisto':''}">
       <div class="area-header" onclick="toggleBloque('${uid}')">
         <div style="flex:1">
-          <div class="area-name">${bloque.area}</div>
+          <div class="area-name">${esImprevisto?'⏱ ':''}${bloque.area}</div>
           ${formatoBloqueTiempo(bloque)}
         </div>
         <span class="area-badge ${badgeCls}">${hechas}/${total}</span>
@@ -1645,7 +1651,7 @@ setInterval(async ()=>{
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260727a';
+const APP_VERSION = '20260727b';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});

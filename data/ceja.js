@@ -364,7 +364,7 @@ export const TAREAS_NOCHE = [
   },
   {
     id: "ceja_noc_13",
-    hora: "22:00–21:20",
+    hora: "22:00–22:20",
     area: "Sala de aeróbicos",
     tareas: [
       "Barrer sala de aeróbicos",

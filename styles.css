@@ -248,6 +248,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .badge-ok{background:rgba(249,115,22,0.15);color:var(--neon);border:1px solid rgba(249,115,22,0.3)}
 .badge-pend{background:rgba(255,136,0,0.15);color:var(--warn);border:1px solid rgba(255,136,0,0.3)}
 .badge-crit{background:rgba(255,51,51,0.12);color:var(--danger);border:1px solid rgba(255,51,51,0.25)}
+.badge-imprevisto{background:rgba(255,255,255,0.06);color:var(--gray);border:1px solid var(--border2)}
+
+.area-block-imprevisto{
+  border-style:dashed;border-color:var(--border2);background:rgba(255,255,255,0.015);
+}
+.area-block-imprevisto .area-name{color:var(--gray)}
 .progress-bar{width:64px;height:4px;background:var(--border2);border-radius:2px;flex-shrink:0}
 .progress-fill{height:100%;background:var(--neon);border-radius:2px;transition:width .4s}
 .chevron{color:var(--gray2);font-size:12px;flex-shrink:0}
