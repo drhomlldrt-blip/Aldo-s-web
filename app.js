@@ -317,15 +317,15 @@ async function renderChecklist(){
       durante todo el turno (piso mojado, papel higiénico, inodoros sucios), no solo dentro de su bloque de horario.
     </div>`;
 
-  let html = selectorHTML + bannerPrioridad + `<div class="section-title">${turnoInfo[turno]||''} <span></span></div>`;
-
-  lista.forEach(bloque=>{
+  let totalHechas=0, totalTareas=0, bloquesCompletos=0;
+  const bloquesHtml = lista.map(bloque=>{
     const hechas = bloque.tareas.filter((_,i)=>estado[`${bloque.id}_${i}`]?.hecho).length;
     const total  = bloque.tareas.length;
     const pct    = Math.round(hechas/total*100);
     const badgeCls = hechas===total?'badge-ok':hechas>0?'badge-pend':'badge-crit';
+    totalHechas+=hechas; totalTareas+=total; if(hechas===total) bloquesCompletos++;
 
-    html += `
+    return `
     <div class="area-block">
       <div class="area-header" onclick="toggleBloque('${bloque.id}')">
         <div style="flex:1">
@@ -359,7 +359,30 @@ async function renderChecklist(){
         }).join('')}
       </div>
     </div>`;
-  });
+  }).join('');
+
+  const pctGlobal = totalTareas ? Math.round(totalHechas/totalTareas*100) : 0;
+  const pendientes = totalTareas-totalHechas;
+  const statsHtml = `
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-top"><span class="stat-label">Avance del turno</span><span class="stat-icon ok">✓</span></div>
+        <div class="stat-num">${pctGlobal}%</div>
+        <div class="stat-sub">${totalHechas} de ${totalTareas} tareas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top"><span class="stat-label">Pendientes</span><span class="stat-icon warn">!</span></div>
+        <div class="stat-num">${pendientes}</div>
+        <div class="stat-sub">tareas sin marcar</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-top"><span class="stat-label">Bloques completos</span><span class="stat-icon info">◔</span></div>
+        <div class="stat-num">${bloquesCompletos}/${lista.length}</div>
+        <div class="stat-sub">áreas al 100%</div>
+      </div>
+    </div>`;
+
+  let html = selectorHTML + bannerPrioridad + statsHtml + `<div class="section-title">${turnoInfo[turno]||''} <span></span></div>` + bloquesHtml;
 
   cont.innerHTML = html;
 }
@@ -1622,7 +1645,7 @@ setInterval(async ()=>{
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260726d';
+const APP_VERSION = '20260726e';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
