@@ -1,310 +1,386 @@
 // ============================================================
 // TAREAS DIARIAS — SUCURSAL SATÉLITE
-// Para agregar más sucursales: copia este archivo,
-// cambia el nombre y actualiza las tareas.
+// Generado a partir de "TAREAS ESPECÍFICAS DEL PERSONAL DE LIMPIEZA"
+// (documento actualizado, con detalle específico por sucursal)
 // ============================================================
 
-export const SUCURSAL_ID = 'SATÉLITE';
-export const SUCURSAL_NOMBRE = 'Sucursal Satélite';
+export const SUCURSAL_ID = "SATÉLITE";
+export const SUCURSAL_NOMBRE = "Sucursal Satélite";
 
 // ------------------------------------------------------------
-// TURNO MAÑANA — 07:00 a 11:00
+// TURNO MAÑANA
 // ------------------------------------------------------------
 export const TAREAS_MANANA = [
   {
-    id: 'man_01',
-    hora: '07:00–07:15',
-    area: 'Baños',
+    id: "satelite_man_01",
+    hora: "07:00–07:10",
+    area: "Baños",
     tareas: [
-      'Verificar agua caliente en duchas',
-      'Verificar papel en dispensadores de baños',
-      'Verificar jabón líquido en dispensador',
-      'Limpiar lavamanos',
-      'Limpiar espejos de baños',
-      'Limpiar urinario de varones',
-      'Limpiar inodoros',
-      'Limpiar tapas de basureros (baños y pasillo)',
-      'Limpiar y secar piso de área de baños',
+      "Verificar agua caliente en duchas, si hay papel en los baños y si hay jabón líquido en el dispensador.",
+      "Limpiar lavamanos",
+      "Limpiar espejos de área de baños",
+      "Limpiar urinarios",
+      "Limpiar inodoros",
+      "Limpiar tapas de basureros de área de baños",
+      "Limpiar duchas",
+      "Limpiar y secar pisos de área de baños (incluyendo piso de afuera)",
+      "Sacar gomas y poner fuera de recepción.",
     ]
   },
   {
-    id: 'man_02',
-    hora: '07:15–07:35',
-    area: 'Pisos flotantes',
+    id: "satelite_man_02",
+    hora: "07:10–07:35",
+    area: "Barrido de piso flotante",
     tareas: [
-      'Barrer piso flotante de todas las áreas',
+      "Barrer piso flotante (sector recepción, trotadoras, lácteos, máquinas y vestidores).",
+      "Barrer gradas",
     ]
   },
   {
-    id: 'man_03',
-    hora: '07:35–07:45',
-    area: 'Vestidores',
+    id: "satelite_man_03",
+    hora: "07:35–07:40",
+    area: "Vestidores",
     tareas: [
-      'Limpiar espejos de vestidores',
-      'Limpiar tapas de basureros de vestidores',
+      "Limpiar espejos y tapas de los basureros de los vestidores",
     ]
   },
   {
-    id: 'man_04',
-    hora: '07:45–07:50',
-    area: 'Sala de aeróbicos',
+    id: "satelite_man_04",
+    hora: "07:40–07:55",
+    area: "Aeróbicos",
     tareas: [
-      'Limpiar espejos de sala de aeróbicos',
+      "Barrer piso (de ser necesario)",
+      "Limpiar espejos de sala de aeróbicos",
+      "Limpiar vidrios del interior de aeróbicos",
+      "Limpiar marcos y ventanas de sala de aeróbicos",
     ]
   },
   {
-    id: 'man_05',
-    hora: '07:50–09:00',
-    area: 'Área de máquinas (piso de goma)',
+    id: "satelite_man_05",
+    hora: "07:55–08:40",
+    area: "Limpieza de piso gaucho",
     tareas: [
-      'Regar y barrer piso de goma',
-      'Limpiar espejos del área de máquinas',
-      'Limpiar máquinas a detalle',
-      'Limpiar aluminio compuesto del área',
+      "Regar y barrer piso de gaucho (también debajo de máquinas), sacar pelusas.",
     ]
   },
   {
-    id: 'man_06',
-    hora: '09:00–09:30',
-    area: 'Pisos flotantes',
+    id: "satelite_man_06",
+    hora: "08:40–09:10",
+    area: "Trapeo de piso flotante",
     tareas: [
-      'Trapear piso flotante de todas las áreas',
+      "Trapear piso flotante (sector recepción, trotadoras, lácteos, máquinas y vestidores).",
+      "Limpiar gradería hacia los baños",
     ]
   },
   {
-    id: 'man_07',
-    hora: '09:30–10:10',
-    area: 'Baños (lavado profundo)',
+    id: "satelite_man_07",
+    hora: "09:10–09:20",
+    area: "Trotadoras",
     tareas: [
-      'Lavar lavamanos',
-      'Lavar paredes de baños, lavamanos, urinario y pasillos',
-      'Lavar urinario',
-      'Lavar inodoros',
-      'Lavar tapas de basureros de baños',
+      "Limpiar superficies plásticas de trotadoras",
     ]
   },
   {
-    id: 'man_08',
-    hora: '10:10–10:40',
-    area: 'Aeróbicos / Spinning (según día)',
+    id: "satelite_man_08",
+    hora: "09:20–09:45",
+    area: "Equipos de musculación",
     tareas: [
-      'Limpiar vidrios y espejos de sala de aeróbicos y spinning (lunes, miércoles y viernes)',
-      'Limpiar trampolines (martes, jueves y sábado)',
+      "Limpiar máquinas que se encuentran sobre piso flotante (partes metálicas y plásticas).",
+      "Limpiar elipticas",
     ]
   },
   {
-    id: 'man_09',
-    hora: '10:40–11:00',
-    area: 'Tiempo de imprevistos',
+    id: "satelite_man_09",
+    hora: "09:45–10:20",
+    area: "Espejos y vidrios",
     tareas: [
-      '20 minutos para imprevistos y repasos',
+      "Limpiar espejos de los vestidores",
+      "Limpiar espejos de la sala de máquinas",
+      "Limpiar vidrios de sala de spinning",
+      "Limpiar vidrios exteriores de la sala de aeróbicos (espejos dentro de la sala de ser necesario).",
+    ]
+  },
+  {
+    id: "satelite_man_10",
+    hora: "10:20–10:45",
+    area: "Baños de damas",
+    tareas: [
+      "Lavar lavamanos y paredes del sector.",
+      "Lavar baño",
+      "Lavar duchas",
+      "Lavar paredes del pasillo de ser necesario.",
+    ]
+  },
+  {
+    id: "satelite_man_11",
+    hora: "10:45–10:55",
+    area: "Baños de varones",
+    tareas: [
+      "Limpiar área baño de varones y dejar limpio",
+    ]
+  },
+  {
+    id: "satelite_man_12",
+    hora: "10:55–11:00",
+    area: "Basureros",
+    tareas: [
+      "Vaciar basureros de los baños y vestidores.",
     ]
   },
 ];
 
 // ------------------------------------------------------------
-// TURNO TARDE — 14:30 a 18:30
+// TURNO TARDE
 // ------------------------------------------------------------
 export const TAREAS_TARDE = [
   {
-    id: 'tar_01',
-    hora: '14:30–14:45',
-    area: 'Baños',
+    id: "satelite_tar_01",
+    hora: "",
+    area: "Tiempo de imprevistos",
     tareas: [
-      'Verificar agua caliente en duchas',
-      'Verificar papel en dispensadores de baños',
-      'Verificar jabón líquido en dispensador',
-      'Limpiar lavamanos',
-      'Limpiar espejos de baños',
-      'Limpiar urinario de varones',
-      'Limpiar inodoros',
-      'Limpiar tapas de basureros (baños y pasillo)',
-      'Limpiar y secar piso de área de baños',
+      "Tiempo para imprevistos o tareas asignadas por recepción o supervisión (5min)",
     ]
   },
   {
-    id: 'tar_02',
-    hora: '14:45–15:05',
-    area: 'Pisos flotantes',
+    id: "satelite_tar_02",
+    hora: "14:30–14:40",
+    area: "Baños",
     tareas: [
-      'Barrer piso flotante de todas las áreas',
+      "Verificar agua caliente en duchas, si hay papel en los baños y si hay jabón líquido en el dispensador.",
+      "Limpiar lavamanos",
+      "Limpiar espejos de área de lavamanos",
+      "Limpiar urinario",
+      "Limpiar inodoros",
+      "Limpiar tapas de basureros de área de baños",
+      "Limpiar duchas",
+      "Limpiar y secar pisos de área de baños",
     ]
   },
   {
-    id: 'tar_03',
-    hora: '15:05–15:15',
-    area: 'Vestidores',
+    id: "satelite_tar_03",
+    hora: "14:40–14:55",
+    area: "Barrido de piso flotante",
     tareas: [
-      'Limpiar espejos de vestidores',
-      'Limpiar tapas de basureros de vestidores',
+      "Barrer piso flotante, (sector recepción, trotadoras, lácteos, máquinas).",
+      "Retirar suciedad acumulada de las gomas.",
+      "Barrer gradas hacia los baños",
     ]
   },
   {
-    id: 'tar_04',
-    hora: '15:15–16:00',
-    area: 'Área de máquinas (piso de goma)',
+    id: "satelite_tar_04",
+    hora: "14:55–15:40",
+    area: "Limpieza de piso gaucho",
     tareas: [
-      'Regar y barrer piso de goma (también debajo de máquinas)',
-      'Sacar pelusas del área',
+      "Regar y barrer pisos de gaucho (también debajo de máquinas), sacar pelusas.",
     ]
   },
   {
-    id: 'tar_05',
-    hora: '16:00–16:30',
-    area: 'Área de cardio',
+    id: "satelite_tar_05",
+    hora: "15:40–16:05",
+    area: "Trotadoras y trampolines",
     tareas: [
-      'Limpiar equipos de cardio a detalle',
-      'Limpiar debajo de los equipos de cardio',
+      "Limpiar trotadoras (lunes, miércoles y viernes)",
+      "Limpiar trampolines (martes y jueves)",
     ]
   },
   {
-    id: 'tar_06',
-    hora: '16:30–17:30',
-    area: 'Máquinas y pisos flotantes',
+    id: "satelite_tar_06",
+    hora: "16:05–16:35",
+    area: "Trapeo de piso flotante",
     tareas: [
-      'Limpiar máquinas del área de piso flotante',
-      'Trapear piso flotante de área de máquinas',
-      'Trapear piso flotante del bar lácteo',
-      'Trapear piso flotante de vestidores',
-      'Trapear piso flotante de recepción (debajo de máquinas también)',
+      "Trapear piso flotante (sector recepción, trotadoras, lácteos, máquinas).",
+      "Limpiar gradería hacia los baños",
     ]
   },
   {
-    id: 'tar_07',
-    hora: '17:30–17:45',
-    area: 'Paredes, ventanas y espejos',
+    id: "satelite_tar_07",
+    hora: "16:35–17:10",
+    area: "Equipos de musculación",
     tareas: [
-      'Limpiar paredes de vestidores',
-      'Limpiar ventanas',
-      'Limpiar espejos del sector de piso flotante',
+      "Limpiar máquinas que están en área de piso goma",
     ]
   },
   {
-    id: 'tar_08',
-    hora: '17:45–18:15',
-    area: 'Duchas y baños',
+    id: "satelite_tar_08",
+    hora: "17:10–17:30",
+    area: "Vestidores",
     tareas: [
-      'Lavar duchas: piso, paredes y puertas',
-      'Quitar restos de grasa y sarro de duchas',
-      'Sacar basura de baños',
-      'Limpiar área de baños',
+      "Limpiar paredes y melaminas de los vestidores de piso de aeróbicos.",
     ]
   },
   {
-    id: 'tar_09',
-    hora: '18:15–18:30',
-    area: 'Tiempo de imprevistos',
+    id: "satelite_tar_09",
+    hora: "17:30–17:50",
+    area: "Ventanas y material aluminio compuesto",
     tareas: [
-      '5 minutos para imprevistos finales',
-      'Dejar todo en orden antes de salir',
+      "Limpiar superficies de marco de las ventanas",
+      "Limpiar aluminios compuestos",
+    ]
+  },
+  {
+    id: "satelite_tar_10",
+    hora: "17:50–18:15",
+    area: "Baños de varones",
+    tareas: [
+      "Lavar lavamanos y paredes del sector.",
+      "Lavar baño",
+      "Lavar urinario",
+      "Lavar duchas",
+      "Lavar vestidor y paredes del pasillo de ser necesario.",
+    ]
+  },
+  {
+    id: "satelite_tar_11",
+    hora: "18:15–18:25",
+    area: "Baños de damas",
+    tareas: [
+      "Limpiar área baño de damas y dejar limpio",
+    ]
+  },
+  {
+    id: "satelite_tar_12",
+    hora: "18:25–18:30",
+    area: "Basureros",
+    tareas: [
+      "Vaciar basurero de los baños y vestidores.",
     ]
   },
 ];
 
 // ------------------------------------------------------------
-// TURNO NOCHE — 18:30 a 22:30
+// TURNO NOCHE
 // ------------------------------------------------------------
 export const TAREAS_NOCHE = [
   {
-    id: 'noc_01',
-    hora: '18:30–18:45',
-    area: 'Baños',
+    id: "satelite_noc_01",
+    hora: "",
+    area: "Tiempo de imprevistos",
     tareas: [
-      'Verificar agua caliente en duchas',
-      'Verificar papel en dispensadores de baños',
-      'Verificar jabón líquido en dispensador',
+      "Tiempo para imprevistos o tareas asignadas por recepción o supervisión (30min)",
     ]
   },
   {
-    id: 'noc_02',
-    hora: '18:45–19:05',
-    area: 'Área de máquinas (piso de goma)',
+    id: "satelite_noc_02",
+    hora: "18:30–18:35",
+    area: "Baños",
     tareas: [
-      'Regar y barrer piso de goma',
+      "Verificar agua caliente en duchas",
+      "Verificar papel en dispensadores",
+      "Verificar jabón líquido en dispensadores",
     ]
   },
   {
-    id: 'noc_03',
-    hora: '19:05–19:30',
-    area: 'Pisos flotantes',
+    id: "satelite_noc_03",
+    hora: "18:35–18:55",
+    area: "Limpieza de piso gaucho",
     tareas: [
-      'Barrer pisos flotantes',
-      'Trapear pisos flotantes',
+      "Regar y barrer piso de goma.",
     ]
   },
   {
-    id: 'noc_04',
-    hora: '19:30–20:05',
-    area: 'Basureros',
+    id: "satelite_noc_04",
+    hora: "18:55–19:25",
+    area: "Limpieza de piso flotante y piso de spinning",
     tareas: [
-      'Lavar y limpiar todos los basureros',
+      "Trapear piso de spinning (después de una clase)",
+      "Barrer y trapear pisos flotantes",
     ]
   },
   {
-    id: 'noc_05',
-    hora: '19:25–21:00',
-    area: 'Mantenimiento general (turno de cuidado)',
+    id: "satelite_noc_05",
+    hora: "19:25–19:45",
+    area: "Basureros",
     tareas: [
-      'Revisar y mantener sala de máquinas limpia',
-      'Revisar y mantener vestidores limpios',
-      'Revisar y mantener área de baños limpia',
-      'Barrer donde sea necesario',
-      'Limpiar espejos o vidrios que estén sucios',
-      'Limpiar escobas (quitar pelos y cabellos)',
-      'Lavar trapos y dejar secar',
-      'Dejar en orden el depósito de implementos de limpieza',
+      "Lavar y limpiar basureros",
     ]
   },
   {
-    id: 'noc_06',
-    hora: '21:00–21:30',
-    area: 'Duchas',
+    id: "satelite_noc_06",
+    hora: "19:45–20:05",
+    area: "Baños",
     tareas: [
-      'Lavar gomas de duchas',
-      'Lavar maderas de duchas',
-      'Limpiar duchas a detalle',
+      "Lavar urinario",
+      "Limpiar baños y duchas",
+      "Limpiar las escobas (quitar pelos o cabellos)",
     ]
   },
   {
-    id: 'noc_07',
-    hora: '21:30–22:00',
-    area: 'Sala de spinning',
+    id: "satelite_noc_07",
+    hora: "20:05–20:25",
+    area: "Varios",
     tareas: [
-      'Barrer sala de spinning',
-      'Limpiar bicicletas de spinning',
-      'Trapear piso de sala de spinning',
+      "Lavar trapos",
+      "Lavar gomas",
+      "Lavar maderas de duchas",
+      "Limpiar Duchas",
     ]
   },
   {
-    id: 'noc_08',
-    hora: '22:00–22:20',
-    area: 'Sala de aeróbicos',
+    id: "satelite_noc_08",
+    hora: "20:25–20:30",
+    area: "Trotadoras",
     tareas: [
-      'Regar y barrer sala de aeróbicos',
+      "Limpiar partes plásticas de las trotadoras",
     ]
   },
   {
-    id: 'noc_09',
-    hora: '22:20–22:30',
-    area: 'Cierre',
+    id: "satelite_noc_09",
+    hora: "20:30–20:45",
+    area: "Limpieza de piso",
     tareas: [
-      'Recoger y sacar todos los basureros',
-      'Dejar todo en orden para el siguiente turno',
+      "Barrer piso de goma",
+      "Barrer pisos flotantes",
+    ]
+  },
+  {
+    id: "satelite_noc_10",
+    hora: "21:00–21:30",
+    area: "Sala de spinning",
+    tareas: [
+      "Barrer sala de spinning",
+      "Limpiar bicicletas",
+      "Trapear piso de la sala de spinning",
+    ]
+  },
+  {
+    id: "satelite_noc_11",
+    hora: "21:50–22:00",
+    area: "Baños",
+    tareas: [
+      "Dejar limpia área de baños y duchas",
+    ]
+  },
+  {
+    id: "satelite_noc_12",
+    hora: "22:00–22:20",
+    area: "Sala de aeróbicos",
+    tareas: [
+      "Regar y barrer sala de aeróbicos",
+    ]
+  },
+  {
+    id: "satelite_noc_13",
+    hora: "22:20–22:30",
+    area: "Basureros",
+    tareas: [
+      "Vaciar todos los basureros y botar las basuras.",
+      "Dejar limpia área de baños y duchas.",
     ]
   },
 ];
 
 // ------------------------------------------------------------
-// ÁREAS PARA REVISIÓN DE RECEPCIÓN
-// Recepción turno tarde revisa estas áreas a las 17:10
+// ÁREAS PARA REVISIÓN DE RECEPCIÓN (referencia; el sistema usa
+// una lista general fija — ver AREAS_REVISION_GENERAL en app.js)
 // ------------------------------------------------------------
 export const AREAS_REVISION = [
-  { id: 'rev_banos',      nombre: 'Baños y duchas' },
-  { id: 'rev_vestidores', nombre: 'Vestidores' },
-  { id: 'rev_maquinas',   nombre: 'Sala de máquinas' },
-  { id: 'rev_aerobicos',  nombre: 'Sala de aeróbicos' },
-  { id: 'rev_spinning',   nombre: 'Sala de spinning' },
-  { id: 'rev_recepcion',  nombre: 'Área de recepción' },
-  { id: 'rev_flotante',   nombre: 'Pisos flotantes' },
-  { id: 'rev_cardio',     nombre: 'Área de cardio' },
+  { id: "rev_banos", nombre: "Baños y duchas" },
+  { id: "rev_vestidores", nombre: "Vestidores" },
+  { id: "rev_maquinas", nombre: "Sala de máquinas" },
+  { id: "rev_aerobicos", nombre: "Sala de aeróbicos" },
+  { id: "rev_spinning", nombre: "Sala de spinning" },
+  { id: "rev_recepcion", nombre: "Área de recepción" },
+  { id: "rev_flotante", nombre: "Pisos flotantes" },
+  { id: "rev_gaucho", nombre: "Piso de goma / máquinas" },
+  { id: "rev_lacteos", nombre: "Área de lácteos" },
 ];

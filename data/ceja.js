@@ -1,6 +1,7 @@
 // ============================================================
 // TAREAS DIARIAS — SUCURSAL CEJA
-// Generado a partir del documento de tareas de limpieza (todas las sucursales)
+// Generado a partir de "TAREAS ESPECÍFICAS DEL PERSONAL DE LIMPIEZA"
+// (documento actualizado, con detalle específico por sucursal)
 // ============================================================
 
 export const SUCURSAL_ID = "CEJA";
@@ -12,10 +13,18 @@ export const SUCURSAL_NOMBRE = "Sucursal Ceja";
 export const TAREAS_MANANA = [
   {
     id: "ceja_man_01",
+    hora: "",
+    area: "Tiempo de imprevistos",
+    tareas: [
+      "Tiempo para imprevistos o tareas asignadas por recepción o supervisión (5min)",
+    ]
+  },
+  {
+    id: "ceja_man_02",
     hora: "07:00–07:10",
     area: "Baños",
     tareas: [
-      "Verificar agua caliente en duchas, si hay papel en los baños y si hay jabón líquido en los dispensadores",
+      "Verificar agua caliente en duchas, si hay papel en los baños y si hay jabón líquido en los dispensadores.",
       "Limpiar lavamanos",
       "Limpiar espejos de área de baños",
       "Limpiar urinarios",
@@ -27,41 +36,41 @@ export const TAREAS_MANANA = [
     ]
   },
   {
-    id: "ceja_man_02",
-    hora: "07:10–07:35",
-    area: "Pisos flotantes",
-    tareas: [
-      "Barrer piso flotante (sector recepción, área de máquinas, debajo de trotadoras, área de máquinas del piso de abajo)",
-    ]
-  },
-  {
     id: "ceja_man_03",
-    hora: "07:35–08:10",
-    area: "Área de máquinas (piso de goma)",
+    hora: "07:10–07:35",
+    area: "Barrido de piso flotante",
     tareas: [
-      "Regar y barrer piso de gaucho (también debajo de máquinas), sacar pelusas",
+      "Barrer piso flotante (sector recepción, área de máquinas, debajo de trotadoras, área de máquinas del piso de abajo).",
     ]
   },
   {
     id: "ceja_man_04",
-    hora: "08:10–08:35",
-    area: "Pisos flotantes",
+    hora: "07:35–08:10",
+    area: "Limpieza de piso gaucho",
     tareas: [
-      "Trapear piso flotante de todas las áreas (sector recepción, área de máquinas, debajo de trotadoras, área de máquinas del piso de abajo",
-      "Limpiar gradería",
+      "Regar y barrer piso de gaucho (también debajo de máquinas), sacar pelusas.",
     ]
   },
   {
     id: "ceja_man_05",
+    hora: "08:10–08:35",
+    area: "Trapeo de piso flotante",
+    tareas: [
+      "Trapear piso flotante de todas las áreas (sector recepción, área de máquinas, debajo de trotadoras, área de máquinas del piso de abajo.",
+      "Limpiar gradería",
+    ]
+  },
+  {
+    id: "ceja_man_06",
     hora: "08:35–08:45",
-    area: "Cardio / Trotadoras",
+    area: "Trotadoras",
     tareas: [
       "Limpiar superficies plásticas de trotadoras",
       "Limpiar marcos de las ventanas (sector trotadoras)",
     ]
   },
   {
-    id: "ceja_man_06",
+    id: "ceja_man_07",
     hora: "08:45–09:30",
     area: "Espejos y vidrios",
     tareas: [
@@ -76,38 +85,38 @@ export const TAREAS_MANANA = [
     ]
   },
   {
-    id: "ceja_man_07",
+    id: "ceja_man_08",
     hora: "09:30–09:55",
-    area: "Limpieza profunda área baño de damas",
+    area: "Baños de damas",
     tareas: [
-      "Lavar lavamanos y paredes del sector",
+      "Lavar lavamanos y paredes del sector.",
       "Lavar baños",
       "Lavar duchas",
-      "Lavar vestidor y paredes de ser necesario",
+      "Lavar vestidor y paredes de ser necesario.",
     ]
   },
   {
-    id: "ceja_man_08",
+    id: "ceja_man_09",
     hora: "09:55–10:05",
-    area: "Baños",
+    area: "Baños de varones",
     tareas: [
       "Limpiar área baño de varones y dejar limpio",
     ]
   },
   {
-    id: "ceja_man_09",
+    id: "ceja_man_10",
     hora: "10:05–10:35",
-    area: "Espejos y vidrios",
+    area: "Sala de aeróbicos",
     tareas: [
       "Limpiar vidrios del interior de aeróbicos",
       "Limpiar espejos de la sala",
-      "Limpiar aluminio compuesto y marcos de las ventanas de la sala",
+      "Limpiar material aluminio compuesto y marcos de las ventanas de la sala",
       "Limpiar mueble de amplificador",
       "Ordenar la sala",
     ]
   },
   {
-    id: "ceja_man_10",
+    id: "ceja_man_11",
     hora: "09:35–09:50",
     area: "Casilleros",
     tareas: [
@@ -115,19 +124,11 @@ export const TAREAS_MANANA = [
     ]
   },
   {
-    id: "ceja_man_11",
+    id: "ceja_man_12",
     hora: "10:55–11:00",
     area: "Basureros",
     tareas: [
-      "Vaciar basurero de los baños y vestidores",
-    ]
-  },
-  {
-    id: "ceja_man_12",
-    hora: "11:00–fin",
-    area: "Tiempo de imprevistos",
-    tareas: [
-      "Tiempo para imprevistos o tareas asignadas por recepción o supervisión (5min)",
+      "Vaciar basureros de los baños y vestidores.",
     ]
   },
 ];
@@ -138,10 +139,18 @@ export const TAREAS_MANANA = [
 export const TAREAS_TARDE = [
   {
     id: "ceja_tar_01",
+    hora: "",
+    area: "Tiempo de imprevistos",
+    tareas: [
+      "Tiempo para imprevistos o tareas asignadas por recepción o supervisión (10min)",
+    ]
+  },
+  {
+    id: "ceja_tar_02",
     hora: "14:30–14:45",
     area: "Baños",
     tareas: [
-      "Verificar agua caliente en duchas, si hay papel en los baños y si hay jabón líquido en el dispensador",
+      "Verificar agua caliente en duchas, si hay papel en los baños y si hay jabón líquido en el dispensador.",
       "Limpiar lavamanos",
       "Limpiar espejos de área de baños",
       "Limpiar urinarios",
@@ -152,9 +161,9 @@ export const TAREAS_TARDE = [
     ]
   },
   {
-    id: "ceja_tar_02",
+    id: "ceja_tar_03",
     hora: "14:45–15:00",
-    area: "Pisos flotantes",
+    area: "Barrido de piso flotante",
     tareas: [
       "Barrer piso flotante, área de máquinas trotadoras y vestidores",
       "Retirar suciedad acumulada del tapete del ingreso y gomas fuera de recepción",
@@ -162,91 +171,83 @@ export const TAREAS_TARDE = [
     ]
   },
   {
-    id: "ceja_tar_03",
+    id: "ceja_tar_04",
     hora: "15:00–15:35",
-    area: "Área de máquinas (piso de goma)",
+    area: "Limpieza de piso gaucho",
     tareas: [
-      "Regar y barrer pisos de gaucho (también debajo de máquinas), sacar pelusas",
+      "Regar y barrer pisos de gaucho (también debajo de máquinas), sacar pelusas.",
     ]
   },
   {
-    id: "ceja_tar_04",
+    id: "ceja_tar_05",
     hora: "15:35–16:00",
-    area: "Cardio / Trotadoras",
+    area: "Trotadoras y trampolines",
     tareas: [
       "Limpiar trotadoras (lunes, miércoles y viernes)",
       "Limpiar trampolines (martes y jueves)",
     ]
   },
   {
-    id: "ceja_tar_05",
+    id: "ceja_tar_06",
     hora: "16:00–16:25",
-    area: "Pisos flotantes",
+    area: "Trapeo de piso flotante",
     tareas: [
-      "Trapear piso flotante de áreas (sector recepción, área de máquinas, área trotadoras, área de máquinas del piso de abajo",
+      "Trapear piso flotante de áreas (sector recepción, área de máquinas, áreas trotadoras, área de máquinas del piso de abajo.",
       "Limpiar gradería",
-      "Limpiar superficie mallas metálicas del piso de abajo",
+      "Limpiar superficie mallas metálicas del piso de abajo.",
     ]
   },
   {
-    id: "ceja_tar_06",
+    id: "ceja_tar_07",
     hora: "16:25–17:05",
-    area: "Máquinas",
+    area: "Equipos de musculación",
     tareas: [
       "Limpiar máquinas (partes metálicas y plásticas)",
     ]
   },
   {
-    id: "ceja_tar_07",
+    id: "ceja_tar_08",
     hora: "17:05–17:20",
-    area: "Otras tareas",
+    area: "Ventiladoras",
     tareas: [
       "Limpiar ventiladoras",
     ]
   },
   {
-    id: "ceja_tar_08",
+    id: "ceja_tar_09",
     hora: "17:20–17:40",
-    area: "Ventanas y marcos",
+    area: "Ventanas y material aluminio compuesto",
     tareas: [
       "Limpiar superficies de marco de las ventanas",
       "Limpiar aluminios compuestos",
     ]
   },
   {
-    id: "ceja_tar_09",
+    id: "ceja_tar_10",
     hora: "17:40–18:05",
-    area: "Limpieza profunda área baño de varones",
+    area: "Baños de varones",
     tareas: [
-      "Lavar lavamanos y paredes del sector",
+      "Lavar lavamanos y paredes del sector.",
       "Lavar baño",
       "Lavar urinarios",
       "Lavar duchas",
-      "Lavar vestidor y paredes del pasillo de ser necesario",
+      "Lavar vestidores y paredes del pasillo de ser necesario.",
     ]
   },
   {
-    id: "ceja_tar_10",
+    id: "ceja_tar_11",
     hora: "18:05–18:15",
-    area: "Baños",
+    area: "Baños de damas",
     tareas: [
       "Limpiar área baño de damas y dejar limpio",
     ]
   },
   {
-    id: "ceja_tar_11",
+    id: "ceja_tar_12",
     hora: "18:25–18:30",
     area: "Basureros",
     tareas: [
-      "Vaciar basurero de los baños y vestidores",
-    ]
-  },
-  {
-    id: "ceja_tar_12",
-    hora: "18:30–fin",
-    area: "Tiempo de imprevistos",
-    tareas: [
-      "Tiempo para imprevistos o tareas asignadas por recepción o supervisor (10min)",
+      "Vaciar basurero de los baños y vestidores.",
     ]
   },
 ];
@@ -257,6 +258,14 @@ export const TAREAS_TARDE = [
 export const TAREAS_NOCHE = [
   {
     id: "ceja_noc_01",
+    hora: "",
+    area: "Tiempo de imprevistos",
+    tareas: [
+      "Tiempo para imprevistos, mantener limpia área de baños y demás o realizar tareas asignadas por recepción o supervisión (30min)",
+    ]
+  },
+  {
+    id: "ceja_noc_02",
     hora: "18:30–18:35",
     area: "Baños",
     tareas: [
@@ -266,67 +275,66 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "ceja_noc_02",
+    id: "ceja_noc_03",
     hora: "18:35–18:55",
-    area: "Área de máquinas (piso de goma)",
+    area: "Limpieza de piso gaucho",
     tareas: [
-      "Regar y barrer piso de goma",
+      "Regar y barrer piso de goma.",
     ]
   },
   {
-    id: "ceja_noc_03",
+    id: "ceja_noc_04",
     hora: "18:55–19:20",
-    area: "Otras tareas",
+    area: "Limpieza de piso flotante",
     tareas: [
       "Barrer y trapear pisos flotantes",
     ]
   },
   {
-    id: "ceja_noc_04",
+    id: "ceja_noc_05",
     hora: "19:25–19:45",
     area: "Basureros",
     tareas: [
-      "Lavar y limpiar basureros",
+      "Lavar basureros",
     ]
   },
   {
-    id: "ceja_noc_05",
+    id: "ceja_noc_06",
     hora: "19:45–19:50",
-    area: "Sala de spinning",
+    area: "Piso de spinning",
     tareas: [
       "Trapear spinning",
     ]
   },
   {
-    id: "ceja_noc_06",
+    id: "ceja_noc_07",
     hora: "19:50–20:10",
     area: "Baños",
     tareas: [
-      "Lavar urinarios",
+      "Lavar urinario",
       "Limpiar baños y duchas",
       "Limpiar las escobas (quitar pelos o cabellos)",
-      "Aplastar botellas para un fácil recojo",
-    ]
-  },
-  {
-    id: "ceja_noc_07",
-    hora: "20:10–20:15",
-    area: "Cardio / Trotadoras",
-    tareas: [
-      "Limpiar partes plásticas del motor de las trotadoras",
     ]
   },
   {
     id: "ceja_noc_08",
-    hora: "20:15–20:30",
-    area: "Área de máquinas (piso de goma)",
+    hora: "20:10–20:15",
+    area: "Trotadoras",
     tareas: [
-      "Regar y barrer piso de goma",
-      "Barrer pisos flotantes",
+      "Limpiar partes plásticas de las trotadoras",
     ]
   },
   {
     id: "ceja_noc_09",
+    hora: "20:15–20:30",
+    area: "Limpieza de piso",
+    tareas: [
+      "Barrer piso de goma",
+      "Barrer pisos flotantes",
+    ]
+  },
+  {
+    id: "ceja_noc_10",
     hora: "21:00–21:30",
     area: "Sala de spinning",
     tareas: [
@@ -336,9 +344,9 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "ceja_noc_10",
+    id: "ceja_noc_11",
     hora: "21:30–21:50",
-    area: "Implementos de limpieza",
+    area: "Varios",
     tareas: [
       "Lavar trapos",
       "Lavar gomas",
@@ -347,16 +355,16 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "ceja_noc_11",
+    id: "ceja_noc_12",
     hora: "21:50–22:00",
     area: "Baños",
     tareas: [
-      "Limpiar área de baños",
+      "Dejar limpia área de baños y duchas",
     ]
   },
   {
-    id: "ceja_noc_12",
-    hora: "22:00–22:20",
+    id: "ceja_noc_13",
+    hora: "22:00–21:20",
     area: "Sala de aeróbicos",
     tareas: [
       "Barrer sala de aeróbicos",
@@ -364,26 +372,19 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "ceja_noc_13",
+    id: "ceja_noc_14",
     hora: "22:20–22:30",
     area: "Basureros",
     tareas: [
-      "Vaciar todos los basureros y botar las basuras",
+      "Vaciar todos los basureros y botar las basuras.",
       "Dejar limpia área de baños y duchas",
-    ]
-  },
-  {
-    id: "ceja_noc_14",
-    hora: "22:30–fin",
-    area: "Tiempo de imprevistos",
-    tareas: [
-      "Tiempo para imprevistos, tareas asignadas por recepción o supervisor. Todas las áreas deben ser cuidados en todo momento, atender cualquier suciedad o basurita. (30min)",
     ]
   },
 ];
 
 // ------------------------------------------------------------
-// ÁREAS PARA REVISIÓN DE RECEPCIÓN
+// ÁREAS PARA REVISIÓN DE RECEPCIÓN (referencia; el sistema usa
+// una lista general fija — ver AREAS_REVISION_GENERAL en app.js)
 // ------------------------------------------------------------
 export const AREAS_REVISION = [
   { id: "rev_banos", nombre: "Baños y duchas" },

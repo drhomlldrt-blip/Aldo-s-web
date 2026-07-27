@@ -1,6 +1,7 @@
 // ============================================================
 // TAREAS DIARIAS — SUCURSAL CRUCE VILLA ADELA
-// Generado a partir del documento de tareas de limpieza (todas las sucursales)
+// Generado a partir de "TAREAS ESPECÍFICAS DEL PERSONAL DE LIMPIEZA"
+// (documento actualizado, con detalle específico por sucursal)
 // ============================================================
 
 export const SUCURSAL_ID = "CRUCE V. ADELA";
@@ -12,10 +13,18 @@ export const SUCURSAL_NOMBRE = "Sucursal Cruce Villa Adela";
 export const TAREAS_MANANA = [
   {
     id: "cruce_man_01",
+    hora: "",
+    area: "Tiempo de imprevistos",
+    tareas: [
+      "Tiempo para imprevistos o tareas asignadas por recepción o supervisión (15min)",
+    ]
+  },
+  {
+    id: "cruce_man_02",
     hora: "07:00–07:10",
     area: "Baños",
     tareas: [
-      "Verificar agua caliente en duchas, si hay papel en los baños y si hay jabón líquido en el dispensador",
+      "Verificar agua caliente en duchas, si hay papel en los baños y si hay jabón líquido en el dispensador.",
       "Limpiar lavamanos",
       "Limpiar espejos de área de baños",
       "Limpiar urinarios",
@@ -27,50 +36,50 @@ export const TAREAS_MANANA = [
     ]
   },
   {
-    id: "cruce_man_02",
+    id: "cruce_man_03",
     hora: "07:10–07:35",
-    area: "Pisos flotantes",
+    area: "Barrido de piso flotante",
     tareas: [
-      "Barrer piso flotante (sector recepción, casilleros, vestidores y sala de máquinas del piso 2 del gym)",
+      "Barrer piso flotante (sector recepción, casilleros, vestidores y sala de máquinas del piso 2 del gym).",
       "Barrer gradas",
     ]
   },
   {
-    id: "cruce_man_03",
-    hora: "07:35–08:20",
-    area: "Área de máquinas (piso de goma)",
-    tareas: [
-      "Regar y barrer piso de gaucho (también debajo de máquinas), sacar pelusas",
-    ]
-  },
-  {
     id: "cruce_man_04",
-    hora: "08:20–08:45",
-    area: "Pisos flotantes",
+    hora: "07:35–08:20",
+    area: "Limpieza de piso gaucho",
     tareas: [
-      "Trapear piso flotante de todas las áreas (sala de spinning y aeróbicos si amerita)",
-      "Limpiar gradería",
-      "Limpiar barandas de área de gradas",
+      "Regar y barrer piso de gaucho (también debajo de máquinas), sacar pelusas.",
     ]
   },
   {
     id: "cruce_man_05",
+    hora: "08:20–08:45",
+    area: "Trapeo de piso flotante",
+    tareas: [
+      "Trapear piso flotante de todas las áreas (sala de spinning y aeróbicos si amerita).",
+      "Limpiar gradería",
+      "Limpiar barandas de área de gradas.",
+    ]
+  },
+  {
+    id: "cruce_man_06",
     hora: "08:45–08:55",
-    area: "Cardio / Trotadoras",
+    area: "Trotadoras",
     tareas: [
       "Limpiar superficies plásticas de trotadoras",
     ]
   },
   {
-    id: "cruce_man_06",
+    id: "cruce_man_07",
     hora: "08:55–09:20",
-    area: "Máquinas",
+    area: "Equipos de musculación",
     tareas: [
-      "Limpiar máquinas que se encuentran en el piso 2 del gym flotante (partes metálicas y plásticas)",
+      "Limpiar máquinas que se encuentran en el piso 2 del gym (partes metálicas y plásticas).",
     ]
   },
   {
-    id: "cruce_man_07",
+    id: "cruce_man_08",
     hora: "09:20–10:05",
     area: "Espejos y vidrios",
     tareas: [
@@ -78,41 +87,33 @@ export const TAREAS_MANANA = [
       "Limpiar espejos de vestidores",
       "Limpiar espejos del segundo piso del gym",
       "Limpiar vidrios de la sala de spinning",
-      "Limpiar vidrios y espejos de la sala de aeróbicos",
-    ]
-  },
-  {
-    id: "cruce_man_08",
-    hora: "10:05–10:30",
-    area: "Limpieza profunda área baño de damas",
-    tareas: [
-      "Lavar lavamanos y paredes del sector",
-      "Lavar baños",
-      "Lavar duchas",
+      "Limpiar vidrios y espejos de la sala de aeróbicos.",
     ]
   },
   {
     id: "cruce_man_09",
+    hora: "10:05–10:30",
+    area: "Baños de damas",
+    tareas: [
+      "Lavar lavamanos y paredes del sector.",
+      "Lavar baño",
+      "Lavar duchas",
+    ]
+  },
+  {
+    id: "cruce_man_10",
     hora: "10:40–10:50",
-    area: "Baños",
+    area: "Baños de varones",
     tareas: [
       "Limpiar área baño de varones y dejar limpio",
     ]
   },
   {
-    id: "cruce_man_10",
+    id: "cruce_man_11",
     hora: "10:55–11:00",
     area: "Basureros",
     tareas: [
-      "Vaciar basurero de los baños y vestidores",
-    ]
-  },
-  {
-    id: "cruce_man_11",
-    hora: "11:00–fin",
-    area: "Tiempo de imprevistos",
-    tareas: [
-      "Tiempo para imprevistos, barrer graderías del edificio o tareas asignadas por recepción o supervisión (15min)",
+      "Vaciar basureros de los baños y vestidores.",
     ]
   },
 ];
@@ -123,10 +124,18 @@ export const TAREAS_MANANA = [
 export const TAREAS_TARDE = [
   {
     id: "cruce_tar_01",
+    hora: "",
+    area: "Tiempo de imprevistos",
+    tareas: [
+      "Tiempo para imprevistos o tareas asignadas por recepción o supervisión (5min)",
+    ]
+  },
+  {
+    id: "cruce_tar_02",
     hora: "14:30–14:40",
     area: "Baños",
     tareas: [
-      "Verificar agua caliente en duchas, si hay papel en los baños y si hay jabón líquido en el dispensador",
+      "Verificar agua caliente en duchas, si hay papel en los baños y si hay jabón líquido en el dispensador.",
       "Limpiar lavamanos",
       "Limpiar espejos de área de baños",
       "Limpiar urinarios",
@@ -137,52 +146,52 @@ export const TAREAS_TARDE = [
     ]
   },
   {
-    id: "cruce_tar_02",
+    id: "cruce_tar_03",
     hora: "14:40–14:55",
-    area: "Pisos flotantes",
+    area: "Barrido de piso flotante",
     tareas: [
-      "Barrer piso flotante, (sector recepción, casilleros, vestidores y sala de máquinas del piso 2 del gym)",
-      "Retirar suciedad acumulada en las gomas",
+      "Barrer piso flotante, (sector recepción, casilleros, vestidores y sala de máquinas del piso 2 del gym).",
+      "Retirar suciedad acumulada en las gomas.",
       "Barrer gradas",
     ]
   },
   {
-    id: "cruce_tar_03",
+    id: "cruce_tar_04",
     hora: "14:55–15:35",
-    area: "Área de máquinas (piso de goma)",
+    area: "Limpieza de piso gaucho",
     tareas: [
-      "Regar y barrer pisos de gaucho (también debajo de máquinas), sacar pelusas",
+      "Regar y barrer pisos de gaucho (también debajo de máquinas), sacar pelusas.",
     ]
   },
   {
-    id: "cruce_tar_04",
+    id: "cruce_tar_05",
     hora: "15:35–16:00",
-    area: "Cardio / Trotadoras",
+    area: "Trotadoras y trampolines",
     tareas: [
       "Limpiar trotadoras (lunes, miércoles y viernes)",
       "Limpiar trampolines (martes y jueves)",
     ]
   },
   {
-    id: "cruce_tar_05",
+    id: "cruce_tar_06",
     hora: "16:00–16:25",
-    area: "Pisos flotantes",
+    area: "Trapeo de piso flotante",
     tareas: [
-      "Trapear piso flotante de todas las áreas (sala de spinning y aeróbicos si amerita)",
+      "Trapear piso flotante de todas las áreas (sala de spinning y aeróbicos si amerita).",
       "Limpiar gradería",
       "Limpiar debajo de la gradería",
     ]
   },
   {
-    id: "cruce_tar_06",
+    id: "cruce_tar_07",
     hora: "16:25–17:00",
-    area: "Máquinas",
+    area: "Equipos de musculación",
     tareas: [
-      "Limpiar máquinas que se encuentran en el piso 1 del gym (partes metálicas y plásticas)",
+      "Limpiar máquinas que se encuentran en el piso 1 del gym (partes metálicas y plásticas).",
     ]
   },
   {
-    id: "cruce_tar_07",
+    id: "cruce_tar_08",
     hora: "17:00–17:20",
     area: "Vestidores",
     tareas: [
@@ -190,48 +199,40 @@ export const TAREAS_TARDE = [
     ]
   },
   {
-    id: "cruce_tar_08",
+    id: "cruce_tar_09",
     hora: "17:20–17:40",
-    area: "Ventanas y marcos",
+    area: "Ventanas y material aluminio compuesto",
     tareas: [
       "Limpiar superficies de marco de las ventanas",
       "Limpiar aluminios compuestos",
     ]
   },
   {
-    id: "cruce_tar_09",
+    id: "cruce_tar_10",
     hora: "17:40–18:05",
-    area: "Limpieza profunda área baño de varones",
+    area: "Baños de varones",
     tareas: [
       "Lavar lavamanos y paredes del sector",
       "Lavar baño",
       "Lavar urinario",
       "Lavar duchas",
-      "Lavar paredes de ser necesario",
+      "Lavar paredes de ser necesario.",
     ]
   },
   {
-    id: "cruce_tar_10",
-    hora: "18:05–18:15",
-    area: "Baños",
+    id: "cruce_tar_11",
+    hora: "18:10–18:20",
+    area: "Baños de damas",
     tareas: [
       "Limpiar área baño de damas y dejar limpio",
     ]
   },
   {
-    id: "cruce_tar_11",
+    id: "cruce_tar_12",
     hora: "18:25–18:30",
     area: "Basureros",
     tareas: [
-      "Vaciar basurero de los baños y vestidores",
-    ]
-  },
-  {
-    id: "cruce_tar_12",
-    hora: "18:30–fin",
-    area: "Tiempo de imprevistos",
-    tareas: [
-      "Tiempo para imprevistos o tareas asignadas por recepción o supervisor (10min)",
+      "Vaciar basurero de los baños y vestidores.",
     ]
   },
 ];
@@ -242,6 +243,14 @@ export const TAREAS_TARDE = [
 export const TAREAS_NOCHE = [
   {
     id: "cruce_noc_01",
+    hora: "",
+    area: "Tiempo de imprevistos",
+    tareas: [
+      "Tiempo para imprevistos o tareas asignadas por recepción o supervisión (15min)",
+    ]
+  },
+  {
+    id: "cruce_noc_02",
     hora: "18:30–18:35",
     area: "Baños",
     tareas: [
@@ -251,68 +260,69 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "cruce_noc_02",
+    id: "cruce_noc_03",
     hora: "18:35–18:55",
-    area: "Área de máquinas (piso de goma)",
+    area: "Limpieza de piso gaucho",
     tareas: [
-      "Regar y barrer piso de goma",
+      "Regar y barrer piso de goma.",
     ]
   },
   {
-    id: "cruce_noc_03",
+    id: "cruce_noc_04",
     hora: "18:55–19:20",
-    area: "Otras tareas",
+    area: "Limpieza de piso flotante",
     tareas: [
       "Barrer y trapear pisos flotantes",
     ]
   },
   {
-    id: "cruce_noc_04",
+    id: "cruce_noc_05",
     hora: "19:20–19:25",
-    area: "Sala de spinning",
+    area: "Piso de spinning",
     tareas: [
       "Trapear spinning",
     ]
   },
   {
-    id: "cruce_noc_05",
+    id: "cruce_noc_06",
     hora: "19:25–19:45",
     area: "Basureros",
     tareas: [
-      "Lavar y limpiar basureros y asientos",
+      "Lavar y limpiar basureros",
+      "Lavar asientos de duchas",
     ]
   },
   {
-    id: "cruce_noc_06",
+    id: "cruce_noc_07",
     hora: "19:45–20:00",
     area: "Baños",
     tareas: [
-      "Lavar urinarios",
+      "Lavar urinario",
       "Limpiar baños y duchas",
       "Limpiar las escobas (quitar pelos o cabellos)",
     ]
   },
   {
-    id: "cruce_noc_07",
-    hora: "20:00–20:25",
-    area: "Implementos de limpieza",
+    id: "cruce_noc_08",
+    hora: "20:05–20:25",
+    area: "Varios",
     tareas: [
       "Lavar trapos",
       "Lavar gomas",
       "Lavar maderas de duchas",
-      "Limpiar Ducha",
-    ]
-  },
-  {
-    id: "cruce_noc_08",
-    hora: "20:25–20:30",
-    area: "Cardio / Trotadoras",
-    tareas: [
-      "Limpiar partes plásticas del motor de las trotadoras",
+      "Limpiar Duchas",
     ]
   },
   {
     id: "cruce_noc_09",
+    hora: "20:25–20:30",
+    area: "Trotadoras",
+    tareas: [
+      "Limpiar partes plásticas de las trotadoras",
+    ]
+  },
+  {
+    id: "cruce_noc_10",
     hora: "20:30–21:00",
     area: "Sala de spinning",
     tareas: [
@@ -322,7 +332,7 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "cruce_noc_10",
+    id: "cruce_noc_11",
     hora: "21:00–21:40",
     area: "Sala de aeróbicos",
     tareas: [
@@ -336,16 +346,16 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "cruce_noc_11",
+    id: "cruce_noc_12",
     hora: "21:40–21:55",
-    area: "Área de máquinas (piso de goma)",
+    area: "Limpieza de piso",
     tareas: [
-      "Regar y barrer piso de goma",
+      "Barrer piso de goma",
       "Barrer pisos flotantes",
     ]
   },
   {
-    id: "cruce_noc_12",
+    id: "cruce_noc_13",
     hora: "21:55–22:05",
     area: "Baños",
     tareas: [
@@ -353,25 +363,18 @@ export const TAREAS_NOCHE = [
     ]
   },
   {
-    id: "cruce_noc_13",
+    id: "cruce_noc_14",
     hora: "22:20–22:30",
     area: "Basureros",
     tareas: [
-      "Vaciar todos los basureros y botar las basuras",
-    ]
-  },
-  {
-    id: "cruce_noc_14",
-    hora: "22:30–fin",
-    area: "Tiempo de imprevistos",
-    tareas: [
-      "Tiempo para imprevistos, limpieza de área MMA o tareas asignadas por recepción o supervisor (15min)",
+      "Vaciar todos los basureros y botar las basuras.",
     ]
   },
 ];
 
 // ------------------------------------------------------------
-// ÁREAS PARA REVISIÓN DE RECEPCIÓN
+// ÁREAS PARA REVISIÓN DE RECEPCIÓN (referencia; el sistema usa
+// una lista general fija — ver AREAS_REVISION_GENERAL en app.js)
 // ------------------------------------------------------------
 export const AREAS_REVISION = [
   { id: "rev_banos", nombre: "Baños y duchas" },
