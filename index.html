@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260727c">
+<link rel="stylesheet" href="styles.css?v=20260727d">
 </head>
 <body>
 
@@ -319,6 +319,19 @@
     <div class="field"><label>Prioridad</label>
       <select id="modal-task-prio"><option value="normal">Normal</option><option value="media">Media</option><option value="alta">Alta — urgente</option></select>
     </div>
+    <div class="field">
+      <label>Foto (opcional)</label>
+      <div class="foto-btns">
+        <button type="button" class="btn-foto" onclick="document.getElementById('modal-foto-camara-sup').click()">📷 Tomar foto</button>
+        <button type="button" class="btn-foto" onclick="document.getElementById('modal-foto-galeria-sup').click()">🖼 Galería</button>
+      </div>
+      <input type="file" id="modal-foto-camara-sup" accept="image/*" capture="environment" style="display:none" onchange="previewFotoSup(this)">
+      <input type="file" id="modal-foto-galeria-sup" accept="image/*" style="display:none" onchange="previewFotoSup(this)">
+      <div id="foto-preview-sup" style="display:none;margin-top:10px">
+        <img id="foto-preview-img-sup" class="report-foto" style="max-height:150px">
+        <button type="button" class="btn-quitar-foto" onclick="quitarFotoSup()">Quitar foto</button>
+      </div>
+    </div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal('modal-tarea-sup')">Cancelar</button>
       <button class="btn-send" onclick="enviarTareaSupervisor()">Asignar</button>
@@ -349,6 +362,14 @@
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20260727c"></script>
+<script type="module" src="app.js?v=20260727d"></script>
+<!-- VISOR DE FOTO A PANTALLA COMPLETA (con zoom y forma clara de salir) -->
+<div class="modal-overlay" id="modal-foto-viewer" onclick="if(event.target===this) cerrarFotoGrande()">
+  <div class="foto-viewer-content">
+    <button class="foto-viewer-close" onclick="cerrarFotoGrande()">✕</button>
+    <img id="foto-viewer-img" src="" alt="Foto del reporte">
+  </div>
+</div>
+
 </body>
 </html>

@@ -331,6 +331,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;padding:0;
 }
 
+.foto-viewer-content{position:relative;max-width:92vw;max-height:92vh}
+.foto-viewer-content img{
+  max-width:92vw;max-height:92vh;border-radius:8px;display:block;
+  box-shadow:0 20px 60px rgba(0,0,0,0.6);
+}
+.foto-viewer-close{
+  position:absolute;top:-16px;right:-16px;width:38px;height:38px;border-radius:50%;
+  background:linear-gradient(180deg,var(--neon2),var(--neon));color:#fff;border:none;
+  font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--btn-shadow);z-index:2;
+}
+.foto-viewer-close:active{box-shadow:var(--btn-shadow-pressed);transform:translateY(1px)}
+
 .tab-badge{
   display:inline-flex;align-items:center;justify-content:center;
   min-width:18px;height:18px;padding:0 5px;border-radius:9px;

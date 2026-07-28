@@ -472,31 +472,14 @@ async function renderRevision(){
     snap.docs.forEach(d=>{ hoyMap[d.data().areaId]=d.data(); });
   }catch(e){}
 
-  const nivelLabel={bien:'✓ Bien',regular:'◐ Regular',falta:'⚠ Falta atención'};
-  const nivelCls  ={bien:'niv-bien',regular:'niv-regular',falta:'niv-falta'};
+  const nivelLabel={bien:'✓ Bien',falta:'⚠ Falta atención'};
+  const nivelCls  ={bien:'niv-bien',falta:'niv-falta'};
 
-  if(esSup){
-    const revisadas=Object.keys(hoyMap).length;
-    cont.innerHTML = `<div class="rev-resumen-sup">Hoy se revisaron <strong>${revisadas}</strong> de <strong>${areas.length}</strong> áreas</div>` +
-    areas.map(nombre=>{
-      const areaId=slugArea(nombre);
-      const marca=hoyMap[areaId];
-      return `
-      <div class="area-block">
-        <div class="area-header-rev">
-          <div style="flex:1;min-width:180px">
-            <div class="area-name">${nombre}</div>
-            ${marca
-              ? `<div class="rev-marca ${nivelCls[marca.nivel]}">${nivelLabel[marca.nivel]} · ${marca.hora} — reportado por ${marca.registradoPor}</div>`
-              : `<div class="rev-marca rev-pendiente">Todavía no la revisó nadie hoy</div>`}
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-    return;
-  }
+  const resumenSup = esSup
+    ? `<div class="rev-resumen-sup">Hoy se revisaron <strong>${Object.keys(hoyMap).length}</strong> de <strong>${areas.length}</strong> áreas</div>`
+    : '';
 
-  cont.innerHTML = areas.map(nombre=>{
+  cont.innerHTML = resumenSup + areas.map(nombre=>{
     const areaId=slugArea(nombre);
     const nombreEsc=nombre.replace(/'/g,"\\'");
     const marca=hoyMap[areaId];
@@ -511,7 +494,6 @@ async function renderRevision(){
         </div>
         <div class="rev-btns">
           <button class="btn-rev btn-bien" onclick="marcarRevision('${areaId}','${nombreEsc}','bien')">✓ Bien</button>
-          <button class="btn-rev btn-regular" onclick="abrirReporteArea('${areaId}','${nombreEsc}','regular')">◐ Regular</button>
           <button class="btn-rev btn-falta" onclick="abrirReporteArea('${areaId}','${nombreEsc}','falta')">⚠ Falta atención</button>
         </div>
       </div>
@@ -605,7 +587,7 @@ window.enviarReporteArea=async function(){
     await setDoc(doc(collection(db,'reportes')),{
       areaId:reporteAreaActual.id, area:reporteAreaActual.nombre,
       estado:'pendiente', nivelRevision:reporteAreaActual.nivel, prio,
-      desc:desc||(reporteAreaActual.nivel==='regular'?'Revisión: estado regular':'Requiere atención'),
+      desc:desc||'Requiere atención',
       sucursal:currentSuc, fecha:hoy, mes:mesActual(), creadoPor:currentUser.name,
       rol:'recepcionista', timestamp:tsAhora(),
       alertaEn: tsAhora()+(24*60*60*1000),
@@ -620,11 +602,30 @@ window.enviarReporteArea=async function(){
 };
 
 // Supervisor asigna tarea especial
+let fotoSupActual=null;
+
 window.abrirReporteSupervisor=function(){
   document.getElementById('modal-task-desc').value='';
   document.getElementById('modal-task-area').value='';
   document.getElementById('modal-task-prio').value='normal';
+  quitarFotoSup();
   document.getElementById('modal-tarea-sup').classList.add('open');
+};
+
+window.previewFotoSup=async function(input){
+  if(!input.files || !input.files[0]) return;
+  try{
+    fotoSupActual = await comprimirImagen(input.files[0]);
+    document.getElementById('foto-preview-img-sup').src=fotoSupActual;
+    document.getElementById('foto-preview-sup').style.display='block';
+  }catch(e){ showToast('No se pudo cargar la foto','err'); }
+};
+
+window.quitarFotoSup=function(){
+  fotoSupActual=null;
+  const prev=document.getElementById('foto-preview-sup'); if(prev) prev.style.display='none';
+  const cam=document.getElementById('modal-foto-camara-sup'); if(cam) cam.value='';
+  const gal=document.getElementById('modal-foto-galeria-sup'); if(gal) gal.value='';
 };
 
 window.enviarTareaSupervisor=async function(){
@@ -639,6 +640,7 @@ window.enviarTareaSupervisor=async function(){
       desc, sucursal:currentSuc, fecha:fechaHoy(), mes:mesActual(),
       creadoPor:currentUser.name, rol:'supervisor', timestamp:tsAhora(),
       alertaEn:tsAhora()+(24*60*60*1000),
+      foto: fotoSupActual||null,
     });
     closeModal('modal-tarea-sup');
     showToast('Tarea asignada al personal de limpieza');
@@ -722,9 +724,19 @@ function renderReportes(){
   }).join('');
 }
 
+// Antes se abría con window.open(dataURL) — muchos navegadores bloquean
+// o dejan en negro una pestaña nueva con una imagen en base64, y no
+// quedaba claro cómo volver. Ahora se abre en un visor propio, dentro
+// del mismo sistema, con una X bien visible para salir.
 window.verFotoGrande=function(id){
   const r=reportes.find(x=>x.id===id);
-  if(r && r.foto) window.open(r.foto,'_blank');
+  if(!r || !r.foto) return;
+  document.getElementById('foto-viewer-img').src=r.foto;
+  document.getElementById('modal-foto-viewer').classList.add('open');
+};
+window.cerrarFotoGrande=function(){
+  document.getElementById('modal-foto-viewer').classList.remove('open');
+  document.getElementById('foto-viewer-img').src='';
 };
 
 // Antes "Diferir" solo cambiaba un campo interno (prio) que no se usaba
@@ -1651,7 +1663,7 @@ setInterval(async ()=>{
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260727c';
+const APP_VERSION = '20260727d';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
