@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260727d">
+<link rel="stylesheet" href="styles.css?v=20260727e">
 </head>
 <body>
 
@@ -129,6 +129,97 @@
       <div class="admin-title">Usuarios de esta sucursal</div>
       <div id="admin-users"></div>
       <button class="add-user-btn" onclick="showAddUserModal()">+ Agregar usuario</button>
+    </div>
+    <div id="panel-pt" class="panel">
+      <div class="clases-toolbar">
+        <div class="clases-switch" id="switch-pt">
+          <button class="clases-switch-btn active" data-vista="sesiones" onclick="cambiarVistaPT('sesiones')">Sesiones de hoy</button>
+          <button class="clases-switch-btn" data-vista="entrenadores" onclick="cambiarVistaPT('entrenadores')">Entrenadores</button>
+          <button class="clases-switch-btn" data-vista="indicadores" onclick="cambiarVistaPT('indicadores')">Indicadores</button>
+          <button class="clases-switch-btn" id="btn-vista-historial-pt" data-vista="historial" style="display:none" onclick="cambiarVistaPT('historial')">Historial</button>
+          <button class="clases-switch-btn" id="btn-vista-auditoria-pt" data-vista="auditoria" style="display:none" onclick="cambiarVistaPT('auditoria')">Auditoría</button>
+        </div>
+        <button class="btn-asignar" id="btn-nueva-sesion-pt" onclick="abrirModalSesionPT()">+ Registrar sesión</button>
+        <button class="btn-asignar" id="btn-nuevo-entrenador" style="display:none" onclick="abrirModalEntrenador()">+ Nuevo entrenador</button>
+      </div>
+      <div id="pt-sesiones-container"></div>
+      <div id="pt-entrenadores-container" style="display:none"></div>
+      <div id="pt-indicadores-container" style="display:none"></div>
+      <div id="pt-historial-container" style="display:none"></div>
+      <div id="pt-auditoria-container" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL REGISTRAR / FINALIZAR SESIÓN DE ENTRENADOR PERSONAL -->
+<div class="modal-overlay" id="modal-sesion-pt">
+  <div class="modal">
+    <div class="modal-title">Registrar sesión</div>
+    <div class="modal-sub">Entrenador personal + cliente</div>
+    <div class="field"><label>Entrenador</label><select id="sesion-entrenador"></select></div>
+    <div class="field"><label>Cliente</label><input type="text" id="sesion-cliente" placeholder="Nombre del cliente"></div>
+    <div class="field"><label>Estado del cliente</label>
+      <select id="sesion-estado-cliente">
+        <option value="nuevo">Nuevo</option>
+        <option value="activo">Activo</option>
+        <option value="congelado">Congelado</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+    <div class="field"><label>Observaciones (opcional)</label><textarea id="sesion-obs" placeholder="Detalle adicional..."></textarea></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-sesion-pt')">Cancelar</button>
+      <button class="btn-send" onclick="guardarSesionPT()">Registrar ingreso</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CREAR/EDITAR ENTRENADOR PERSONAL (solo supervisor) -->
+<div class="modal-overlay" id="modal-entrenador">
+  <div class="modal">
+    <div class="modal-title" id="modal-entrenador-titulo">Nuevo entrenador</div>
+    <input type="hidden" id="entrenador-id-edit">
+    <div class="field"><label>Código único</label><input type="text" id="entrenador-codigo" placeholder="Ej: PT-001"></div>
+    <div class="field"><label>Nombre completo</label><input type="text" id="entrenador-nombre" placeholder="Nombre y apellido"></div>
+    <div class="field-row">
+      <div class="field"><label>Estado</label>
+        <select id="entrenador-estado">
+          <option value="activo">Activo</option>
+          <option value="suspendido">Suspendido</option>
+          <option value="inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div class="field"><label>Vigencia hasta</label><input type="date" id="entrenador-vigencia"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Fecha de autorización</label><input type="date" id="entrenador-fecha-autorizacion"></div>
+      <div class="field"><label>Autorizado por</label><input type="text" id="entrenador-responsable" placeholder="Nombre"></div>
+    </div>
+    <div class="field"><label>Sucursales habilitadas</label>
+      <div id="entrenador-sucursales" class="checkbox-list"></div>
+    </div>
+    <div class="field"><label>Observaciones</label><textarea id="entrenador-obs" placeholder="Notas adicionales..."></textarea></div>
+    <div class="field" id="campo-nueva-incidencia" style="display:none">
+      <label>Agregar incidencia (opcional)</label>
+      <input type="text" id="entrenador-nueva-incidencia" placeholder="Describe la incidencia...">
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-entrenador')">Cancelar</button>
+      <button class="btn-send" onclick="guardarEntrenador()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ANULAR SESIÓN (auditoría: nunca se borra, solo se anula con motivo) -->
+<div class="modal-overlay" id="modal-anular-pt">
+  <div class="modal">
+    <div class="modal-title">Anular sesión</div>
+    <div class="modal-sub">No se borra el registro — queda anulado, con motivo, para la auditoría</div>
+    <input type="hidden" id="anular-sesion-id">
+    <div class="field"><label>Motivo de la anulación</label><textarea id="anular-motivo" placeholder="Por qué se anula este registro..."></textarea></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-anular-pt')">Cancelar</button>
+      <button class="btn-send" onclick="confirmarAnularSesion()">Anular sesión</button>
     </div>
   </div>
 </div>
@@ -362,7 +453,7 @@
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20260727d"></script>
+<script type="module" src="app.js?v=20260727e"></script>
 <!-- VISOR DE FOTO A PANTALLA COMPLETA (con zoom y forma clara de salir) -->
 <div class="modal-overlay" id="modal-foto-viewer" onclick="if(event.target===this) cerrarFotoGrande()">
   <div class="foto-viewer-content">

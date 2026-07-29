@@ -665,3 +665,81 @@ textarea:focus{border-color:var(--neon)}
   .turno-selector{flex-direction:column}
   .btn-turno{min-width:auto}
 }
+
+/* ===================== CONTROL DE ENTRENADORES PERSONALES ===================== */
+.checkbox-list{display:flex;flex-wrap:wrap;gap:8px}
+.checkbox-chip{
+  display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border2);
+  border-radius:8px;padding:7px 12px;font-size:12px;color:var(--text2);cursor:pointer;user-select:none;
+}
+.checkbox-chip input{accent-color:var(--neon)}
+.checkbox-chip.checked{border-color:var(--neon);color:var(--text)}
+
+.pt-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+@media(max-width:700px){.pt-kpi-grid{grid-template-columns:1fr 1fr}}
+.pt-kpi-card{
+  background:var(--surface-light);border-radius:var(--radius);padding:14px 16px;
+  box-shadow:0 1px 0 rgba(255,255,255,0.6) inset, 0 8px 22px rgba(0,0,0,0.3);
+}
+.pt-kpi-num{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--ink);line-height:1}
+.pt-kpi-label{font-size:10px;color:var(--ink2);letter-spacing:.4px;text-transform:uppercase;margin-top:6px;font-weight:700}
+
+.pt-filtros{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.pt-filtros select,.pt-filtros input{
+  background:var(--surface2);border:1px solid var(--border2);border-radius:8px;
+  padding:8px 12px;color:var(--text);font-family:inherit;font-size:12.5px;
+}
+
+.sesion-card{
+  background:var(--surface);background-image:var(--card-texture);border:1px solid var(--border2);
+  border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;
+  box-shadow:var(--card-shadow);
+}
+.sesion-card.en-curso{border-left:3px solid var(--neon)}
+.sesion-card.anulada{opacity:.55}
+.sesion-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.sesion-cliente{font-size:14px;font-weight:700;color:var(--text)}
+.sesion-entrenador{font-size:12px;color:var(--neon);margin-top:2px}
+.sesion-meta{font-size:11px;color:var(--gray);margin-top:4px}
+.sesion-obs{font-size:12px;color:var(--text2);margin-top:6px;font-style:italic}
+.sesion-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+
+.estado-badge.estado-activo{background:rgba(249,115,22,.15);color:var(--neon)}
+.estado-badge.estado-suspendido{background:rgba(255,136,0,.15);color:var(--warn)}
+.estado-badge.estado-inactivo{background:rgba(120,120,120,.15);color:var(--gray)}
+.estado-badge.estado-en_curso{background:rgba(249,115,22,.15);color:var(--neon)}
+.estado-badge.estado-finalizada{background:rgba(120,170,255,.15);color:#78aaff}
+.estado-badge.estado-anulada{background:rgba(255,51,51,.12);color:var(--danger)}
+
+.entrenador-card{
+  background:var(--surface);background-image:var(--card-texture);border:1px solid var(--border2);
+  border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;
+  box-shadow:var(--card-shadow);cursor:pointer;
+}
+.entrenador-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.entrenador-nombre{font-size:14px;font-weight:700}
+.entrenador-codigo{font-size:10.5px;color:var(--gray2);letter-spacing:.5px}
+.entrenador-meta{font-size:11.5px;color:var(--gray);margin-top:6px}
+.entrenador-sucs{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.suc-tag-mini{font-size:9.5px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:2px 8px;color:var(--text2)}
+
+.alerta-auto{
+  display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:8px;
+  background:rgba(255,51,51,0.07);border:1px solid rgba(255,51,51,0.25);margin-bottom:8px;font-size:12.5px;
+}
+.alerta-auto .icono{font-size:15px;flex-shrink:0}
+.alerta-auto b{color:var(--danger)}
+
+.auditoria-row{
+  display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--border);
+  font-size:12px;flex-wrap:wrap;
+}
+.auditoria-row:first-child{border-top:none}
+.auditoria-cambio{color:var(--text2)}
+.auditoria-meta{color:var(--gray2);font-size:11px}
+
+.ranking-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--border)}
+.ranking-row:first-child{border-top:none}
+.ranking-pos{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--gray2);width:24px;flex-shrink:0}
+.ranking-nombre{flex:1;font-size:13px;font-weight:600}
+.ranking-num{font-size:12px;color:var(--neon);font-weight:700}

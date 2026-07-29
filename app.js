@@ -174,6 +174,7 @@ async function loadDash(){
       {id:'panel-historial', label:'Historial'},
       {id:'panel-aerobicos', label:'Aeróbicos'},
       {id:'panel-spinning',  label:'Spinning'},
+      {id:'panel-pt',        label:'Entrenadores PT'},
       {id:'panel-alertas',   label:'Alertas'},
       {id:'panel-admin',     label:'Usuarios'},
     ];
@@ -183,6 +184,7 @@ async function loadDash(){
       {id:'panel-reportes',  label:'Mis reportes'},
       {id:'panel-aerobicos', label:'Aeróbicos'},
       {id:'panel-spinning',  label:'Spinning'},
+      {id:'panel-pt',        label:'Entrenadores PT'},
     ];
   } else if(currentUser.role==='limpieza'){
     tabs=[
@@ -191,7 +193,7 @@ async function loadDash(){
     ];
   }
 
-  const allPanels=['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin','panel-aerobicos','panel-spinning'];
+  const allPanels=['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin','panel-aerobicos','panel-spinning','panel-pt'];
   allPanels.forEach(p=>document.getElementById(p).classList.remove('active'));
 
   const tabsEl=document.getElementById('tabs-container');
@@ -214,6 +216,7 @@ async function loadDash(){
       if(t.id==='panel-historial')  cargarHistorial();
       if(t.id==='panel-revision')   renderRevision();
       if(t.id==='panel-alertas')    cargarAlertas();
+      if(t.id==='panel-pt')        initPTPanel();
       if(t.id==='panel-admin')      cargarUsuarios();
       if(t.id==='panel-aerobicos')  initClasesPanel('aerobicos');
       if(t.id==='panel-spinning')   initClasesPanel('spinning');
@@ -1663,7 +1666,7 @@ setInterval(async ()=>{
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260727d';
+const APP_VERSION = '20260727e';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
@@ -1671,3 +1674,555 @@ setInterval(async ()=>{
     if(data.version && data.version !== APP_VERSION) location.reload();
   }catch(e){}
 }, 180000); // cada 3 minutos
+
+// ============================================================
+// CONTROL DE ENTRENADORES PERSONALES
+// Colecciones en Firestore:
+//   'entrenadores'  -> registro global de entrenadores (no por sucursal,
+//                       porque un mismo entrenador puede estar habilitado
+//                       en varias sucursales a la vez)
+//   'sesiones_pt'   -> cada sesión de entrenamiento (sí por sucursal)
+//   'auditoria_pt'  -> registro de todo cambio (alta/edición/anulación),
+//                       nunca se borra nada, solo se anula con motivo
+// ============================================================
+const SUCURSALES = SUCURSALES_DATA.map(m=>m.SUCURSAL_ID);
+
+let entrenadoresData = [];
+let sesionesHoyData  = [];
+let vistaActualPT = 'sesiones';
+
+function estadoClienteLabel(e){ return {nuevo:'Nuevo',activo:'Activo',congelado:'Congelado',otro:'Otro'}[e]||e; }
+function estadoEntrenadorLabel(e){ return {activo:'Activo',suspendido:'Suspendido',inactivo:'Inactivo'}[e]||e; }
+function estadoSesionLabel(e){ return {en_curso:'En curso',finalizada:'Finalizada',anulada:'Anulada'}[e]||e; }
+
+function duracionHoras(ini, fin){
+  if(!ini || !fin) return 0;
+  const [h1,m1]=ini.split(':').map(Number), [h2,m2]=fin.split(':').map(Number);
+  let mins=(h2*60+m2)-(h1*60+m1);
+  if(mins<0) mins+=1440;
+  return mins/60;
+}
+
+// ------------------------------------------------------------
+// Entrada del panel
+// ------------------------------------------------------------
+window.initPTPanel = async function(){
+  const esSup = currentUser.role==='supervisor';
+  document.getElementById('btn-nuevo-entrenador').style.display = esSup?'inline-flex':'none';
+  document.getElementById('btn-vista-auditoria-pt').style.display = esSup?'inline-flex':'none';
+  document.getElementById('btn-vista-historial-pt').style.display = esSup?'inline-flex':'none';
+  // recepción solo opera sesiones, no administra entrenadores ni ve indicadores/auditoría
+  document.querySelectorAll('#switch-pt [data-vista="entrenadores"], #switch-pt [data-vista="indicadores"]')
+    .forEach(b=>b.style.display = esSup?'inline-flex':'none');
+
+  showLoading();
+  try{
+    const se = await getDocs(collection(db,'entrenadores'));
+    entrenadoresData = se.docs.map(d=>({id:d.id,...d.data()}));
+
+    const qs = query(collection(db,'sesiones_pt'), where('sucursal','==',currentSuc), where('fecha','==',fechaHoy()));
+    const ss = await getDocs(qs);
+    sesionesHoyData = ss.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e){ showToast('Error al cargar entrenadores','err'); }
+  hideLoading();
+
+  cambiarVistaPT('sesiones');
+};
+
+window.cambiarVistaPT = function(vista){
+  vistaActualPT = vista;
+  document.querySelectorAll('#switch-pt .clases-switch-btn').forEach(b=>b.classList.remove('active'));
+  const btn=document.querySelector(`#switch-pt [data-vista="${vista}"]`);
+  if(btn) btn.classList.add('active');
+  ['sesiones','entrenadores','indicadores','historial','auditoria'].forEach(v=>{
+    document.getElementById(`pt-${v}-container`).style.display = v===vista?'block':'none';
+  });
+  const esSup = currentUser.role==='supervisor';
+  document.getElementById('btn-nueva-sesion-pt').style.display = vista==='sesiones'?'inline-flex':'none';
+  document.getElementById('btn-nuevo-entrenador').style.display = (vista==='entrenadores' && esSup)?'inline-flex':'none';
+
+  if(vista==='sesiones')     renderSesionesPT();
+  if(vista==='entrenadores') renderEntrenadoresPT();
+  if(vista==='indicadores')  renderIndicadoresPT();
+  if(vista==='historial')    renderHistorialPT();
+  if(vista==='auditoria')    renderAuditoriaPT();
+};
+
+// ------------------------------------------------------------
+// SESIONES DE HOY (registro operativo — recepción y supervisor)
+// ------------------------------------------------------------
+function renderSesionesPT(){
+  const cont = document.getElementById('pt-sesiones-container');
+  const orden = {en_curso:0, finalizada:1, anulada:2};
+  const lista = [...sesionesHoyData].sort((a,b)=> (orden[a.estado]-orden[b.estado]) || (a.horaInicio||'').localeCompare(b.horaInicio||''));
+  if(!lista.length){ cont.innerHTML='<div class="empty">Sin sesiones registradas hoy en esta sucursal</div>'; return; }
+
+  const esSup = currentUser.role==='supervisor';
+  cont.innerHTML = lista.map(s=>`
+    <div class="sesion-card ${s.estado==='en_curso'?'en-curso':''} ${s.estado==='anulada'?'anulada':''}">
+      <div class="sesion-top">
+        <div>
+          <div class="sesion-cliente">${s.cliente}</div>
+          <div class="sesion-entrenador">${s.entrenadorNombre} ${s.entrenadorCodigo?'· '+s.entrenadorCodigo:''}</div>
+        </div>
+        <span class="estado-badge estado-${s.estado}">${estadoSesionLabel(s.estado)}</span>
+      </div>
+      <div class="sesion-meta">
+        ${s.horaInicio}${s.horaFin?' – '+s.horaFin:' – en curso'} ·
+        Cliente ${estadoClienteLabel(s.estadoCliente)} · Registró: ${s.recepcionista}
+      </div>
+      ${s.observaciones?`<div class="sesion-obs">${s.observaciones}</div>`:''}
+      ${s.estado==='anulada'?`<div class="sesion-obs">Anulada por ${s.anuladoPor}: ${s.motivoAnulacion}</div>`:''}
+      <div class="sesion-actions">
+        ${s.estado==='en_curso'?`<button class="btn-sm btn-atend" onclick="finalizarSesionPT('${s.id}')">✓ Finalizar sesión</button>`:''}
+        ${esSup && s.estado!=='anulada'?`<button class="btn-sm btn-noatend" onclick="abrirModalAnularSesion('${s.id}')">Anular</button>`:''}
+      </div>
+    </div>`).join('');
+}
+
+window.abrirModalSesionPT = function(){
+  const disponibles = entrenadoresData.filter(e=>e.estado==='activo' && (e.sucursalesHabilitadas||[]).includes(currentSuc));
+  const sel = document.getElementById('sesion-entrenador');
+  if(!disponibles.length){
+    sel.innerHTML = `<option value="">Sin entrenadores autorizados en esta sucursal</option>`;
+  } else {
+    sel.innerHTML = disponibles.map(e=>`<option value="${e.id}">${e.nombre} (${e.codigo})</option>`).join('');
+  }
+  document.getElementById('sesion-cliente').value='';
+  document.getElementById('sesion-estado-cliente').value='nuevo';
+  document.getElementById('sesion-obs').value='';
+  document.getElementById('modal-sesion-pt').classList.add('open');
+};
+
+window.guardarSesionPT = async function(){
+  const entrenadorId = document.getElementById('sesion-entrenador').value;
+  const cliente = document.getElementById('sesion-cliente').value.trim();
+  const estadoCliente = document.getElementById('sesion-estado-cliente').value;
+  const obs = document.getElementById('sesion-obs').value.trim();
+  if(!entrenadorId){ showToast('No hay entrenador autorizado seleccionable','err'); return; }
+  if(!cliente){ showToast('Escribe el nombre del cliente','err'); return; }
+  const entrenador = entrenadoresData.find(e=>e.id===entrenadorId);
+  showLoading();
+  try{
+    await setDoc(doc(collection(db,'sesiones_pt')),{
+      sucursal:currentSuc, entrenadorId, entrenadorCodigo:entrenador?entrenador.codigo:'', entrenadorNombre:entrenador?entrenador.nombre:'',
+      cliente, estadoCliente, fecha:fechaHoy(), horaInicio:horaActual(), horaFin:null,
+      estado:'en_curso', observaciones:obs, recepcionista:currentUser.name,
+      creadoEn:new Date().toISOString(),
+    });
+    closeModal('modal-sesion-pt');
+    showToast('Sesión registrada');
+    await initPTPanel();
+  } catch(e){ showToast('Error al registrar la sesión','err'); }
+  hideLoading();
+};
+
+window.finalizarSesionPT = async function(id){
+  if(!confirm('¿Marcar esta sesión como finalizada?')) return;
+  showLoading();
+  try{
+    await updateDoc(doc(db,'sesiones_pt',id),{ horaFin:horaActual(), estado:'finalizada', finalizadoPor:currentUser.name });
+    await initPTPanel();
+    showToast('Sesión finalizada');
+  } catch(e){ showToast('Error','err'); }
+  hideLoading();
+};
+
+// No se borran sesiones nunca — solo se anulan, con motivo, quedando en
+// el historial para la auditoría.
+window.abrirModalAnularSesion = function(id){
+  document.getElementById('anular-sesion-id').value=id;
+  document.getElementById('anular-motivo').value='';
+  document.getElementById('modal-anular-pt').classList.add('open');
+};
+
+window.confirmarAnularSesion = async function(){
+  const id = document.getElementById('anular-sesion-id').value;
+  const motivo = document.getElementById('anular-motivo').value.trim();
+  if(!motivo){ showToast('Indica el motivo de la anulación','err'); return; }
+  const s = sesionesHoyData.find(x=>x.id===id);
+  showLoading();
+  try{
+    await updateDoc(doc(db,'sesiones_pt',id),{ estado:'anulada', anuladoPor:currentUser.name, anuladoEn:new Date().toISOString(), motivoAnulacion:motivo });
+    await registrarAuditoria('sesion', id, s?`${s.cliente} con ${s.entrenadorNombre}`:'Sesión', 'Sesión anulada', motivo);
+    closeModal('modal-anular-pt');
+    showToast('Sesión anulada');
+    await initPTPanel();
+  } catch(e){ showToast('Error','err'); }
+  hideLoading();
+};
+
+// ------------------------------------------------------------
+// ENTRENADORES (administración — solo supervisor puede crear/editar;
+// recepción puede ver el listado para saber quién está autorizado)
+// ------------------------------------------------------------
+function renderEntrenadoresPT(){
+  const cont = document.getElementById('pt-entrenadores-container');
+  if(!entrenadoresData.length){ cont.innerHTML='<div class="empty">Todavía no hay entrenadores registrados</div>'; return; }
+  const esSup = currentUser.role==='supervisor';
+  const lista = [...entrenadoresData].sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
+  cont.innerHTML = lista.map(e=>{
+    const vencido = e.vigenciaHasta && e.vigenciaHasta < fechaHoy();
+    return `
+    <div class="entrenador-card" ${esSup?`onclick="abrirModalEntrenador('${e.id}')"`:''}>
+      <div class="entrenador-top">
+        <div>
+          <div class="entrenador-nombre">${e.nombre}</div>
+          <div class="entrenador-codigo">${e.codigo}</div>
+        </div>
+        <span class="estado-badge estado-${e.estado}">${estadoEntrenadorLabel(e.estado)}${vencido?' · vencido':''}</span>
+      </div>
+      <div class="entrenador-meta">
+        Autorizado ${e.fechaAutorizacion||'—'} por ${e.autorizadoPor||'—'}
+        ${e.vigenciaHasta?' · vigencia hasta '+e.vigenciaHasta:''}
+        ${(e.incidencias||[]).length?' · '+e.incidencias.length+' incidencia(s)':''}
+      </div>
+      ${e.observaciones?`<div class="sesion-obs">${e.observaciones}</div>`:''}
+      <div class="entrenador-sucs">
+        ${(e.sucursalesHabilitadas||[]).map(s=>`<span class="suc-tag-mini">${s}</span>`).join('')||'<span class="suc-tag-mini">Sin sucursales asignadas</span>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function siguienteCodigoEntrenador(){
+  const nums = entrenadoresData.map(e=>{
+    const m=(e.codigo||'').match(/(\d+)$/);
+    return m?parseInt(m[1],10):0;
+  });
+  const next = (nums.length?Math.max(...nums):0)+1;
+  return 'PT-'+String(next).padStart(3,'0');
+}
+
+function renderChecksSucursalesPT(seleccionadas){
+  const cont = document.getElementById('entrenador-sucursales');
+  cont.innerHTML = SUCURSALES.map(s=>`
+    <label class="checkbox-chip ${seleccionadas.includes(s)?'checked':''}">
+      <input type="checkbox" value="${s}" ${seleccionadas.includes(s)?'checked':''}
+        onchange="this.parentElement.classList.toggle('checked',this.checked)">
+      ${s}
+    </label>`).join('');
+}
+
+window.abrirModalEntrenador = function(id){
+  const e = id ? entrenadoresData.find(x=>x.id===id) : null;
+  document.getElementById('entrenador-id-edit').value = id||'';
+  document.getElementById('modal-entrenador-titulo').textContent = e?'Editar entrenador':'Nuevo entrenador';
+  const codigoInput = document.getElementById('entrenador-codigo');
+  codigoInput.value = e?e.codigo:siguienteCodigoEntrenador();
+  codigoInput.readOnly = !!e; // el código no se cambia una vez creado, por trazabilidad
+  document.getElementById('entrenador-nombre').value = e?e.nombre:'';
+  document.getElementById('entrenador-estado').value = e?e.estado:'activo';
+  document.getElementById('entrenador-vigencia').value = e?(e.vigenciaHasta||''):'';
+  document.getElementById('entrenador-fecha-autorizacion').value = e?(e.fechaAutorizacion||''):fechaHoy();
+  document.getElementById('entrenador-responsable').value = e?(e.autorizadoPor||''):currentUser.name;
+  document.getElementById('entrenador-obs').value = e?(e.observaciones||''):'';
+  document.getElementById('entrenador-nueva-incidencia').value='';
+  document.getElementById('campo-nueva-incidencia').style.display = e?'block':'none';
+  renderChecksSucursalesPT(e?(e.sucursalesHabilitadas||[]):[currentSuc]);
+  document.getElementById('modal-entrenador').classList.add('open');
+};
+
+window.guardarEntrenador = async function(){
+  const id = document.getElementById('entrenador-id-edit').value;
+  const codigo = document.getElementById('entrenador-codigo').value.trim();
+  const nombre = document.getElementById('entrenador-nombre').value.trim();
+  const estado = document.getElementById('entrenador-estado').value;
+  const vigenciaHasta = document.getElementById('entrenador-vigencia').value;
+  const fechaAutorizacion = document.getElementById('entrenador-fecha-autorizacion').value;
+  const autorizadoPor = document.getElementById('entrenador-responsable').value.trim();
+  const observaciones = document.getElementById('entrenador-obs').value.trim();
+  const nuevaIncidencia = document.getElementById('entrenador-nueva-incidencia').value.trim();
+  const sucursalesHabilitadas = [...document.querySelectorAll('#entrenador-sucursales input:checked')].map(cb=>cb.value);
+
+  if(!codigo || !nombre){ showToast('Completa código y nombre','err'); return; }
+  showLoading();
+  try{
+    if(id){
+      const anterior = entrenadoresData.find(x=>x.id===id);
+      const incidencias = anterior?.incidencias||[];
+      if(nuevaIncidencia) incidencias.push({fecha:fechaHoy(), descripcion:nuevaIncidencia, registradoPor:currentUser.name});
+      await updateDoc(doc(db,'entrenadores',id),{
+        nombre, estado, vigenciaHasta, fechaAutorizacion, autorizadoPor, observaciones,
+        sucursalesHabilitadas, incidencias,
+        actualizadoPor:currentUser.name, actualizadoEn:new Date().toISOString(),
+      });
+      let cambio = 'Editó datos del entrenador';
+      if(anterior && anterior.estado!==estado) cambio = `Cambió el estado de ${estadoEntrenadorLabel(anterior.estado)} a ${estadoEntrenadorLabel(estado)}`;
+      await registrarAuditoria('entrenador', id, nombre, cambio, nuevaIncidencia||'');
+    } else {
+      const ref = doc(collection(db,'entrenadores'));
+      await setDoc(ref,{
+        codigo, nombre, estado, vigenciaHasta, fechaAutorizacion, autorizadoPor, observaciones,
+        sucursalesHabilitadas, incidencias:[],
+        creadoPor:currentUser.name, creadoEn:new Date().toISOString(),
+      });
+      await registrarAuditoria('entrenador', ref.id, nombre, 'Entrenador registrado (alta inicial)', '');
+    }
+    closeModal('modal-entrenador');
+    showToast('Entrenador guardado');
+    await initPTPanel();
+  } catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
+};
+
+// ------------------------------------------------------------
+// HISTORIAL COMPLETO DE SESIONES (más allá de "hoy") — permite
+// buscar por cliente, por entrenador, o por rango de fechas. Es el
+// "historial completo" / "reporte por cliente" que pedía la
+// especificación, sin depender solo de los totales de Indicadores.
+// ------------------------------------------------------------
+function renderHistorialPT(){
+  const cont = document.getElementById('pt-historial-container');
+  const hoy = fechaHoy();
+  const hace7 = fechaLocal(new Date(Date.now()-6*86400000));
+  cont.innerHTML = `
+    <div class="pt-filtros">
+      <input type="date" id="pt-hist-desde" value="${hace7}">
+      <input type="date" id="pt-hist-hasta" value="${hoy}">
+      <select id="pt-hist-entrenador">
+        <option value="">Todos los entrenadores</option>
+        ${entrenadoresData.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('')}
+      </select>
+      <input type="text" id="pt-hist-cliente" placeholder="Buscar cliente...">
+      <button class="btn-mini btn-mini-ok" onclick="buscarHistorialPT()">Buscar</button>
+    </div>
+    <div id="pt-historial-resultado"><div class="empty">Elegí un rango y tocá Buscar</div></div>`;
+}
+
+window.buscarHistorialPT = async function(){
+  const cont = document.getElementById('pt-historial-resultado');
+  const desde = document.getElementById('pt-hist-desde').value;
+  const hasta = document.getElementById('pt-hist-hasta').value;
+  const entFiltro = document.getElementById('pt-hist-entrenador').value;
+  const clienteFiltro = document.getElementById('pt-hist-cliente').value.trim().toLowerCase();
+  cont.innerHTML = '<div class="empty">Buscando...</div>';
+  try{
+    const snap = await getDocs(query(collection(db,'sesiones_pt'), where('sucursal','==',currentSuc)));
+    let lista = snap.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(s=>s.fecha>=desde && s.fecha<=hasta);
+    if(entFiltro) lista = lista.filter(s=>s.entrenadorId===entFiltro);
+    if(clienteFiltro) lista = lista.filter(s=>(s.cliente||'').toLowerCase().includes(clienteFiltro));
+    lista.sort((a,b)=> (b.fecha+b.horaInicio).localeCompare(a.fecha+a.horaInicio));
+
+    if(!lista.length){ cont.innerHTML='<div class="empty">Sin sesiones en ese rango</div>'; return; }
+
+    const horas = lista.filter(s=>s.estado!=='anulada').reduce((acc,s)=>acc+duracionHoras(s.horaInicio,s.horaFin),0);
+    cont.innerHTML = `<div class="rev-resumen-sup">${lista.length} sesión(es) encontradas · ${horas.toFixed(1)}h en total</div>` +
+      lista.map(s=>`
+      <div class="sesion-card ${s.estado==='en_curso'?'en-curso':''} ${s.estado==='anulada'?'anulada':''}">
+        <div class="sesion-top">
+          <div>
+            <div class="sesion-cliente">${s.cliente}</div>
+            <div class="sesion-entrenador">${s.entrenadorNombre} ${s.entrenadorCodigo?'· '+s.entrenadorCodigo:''}</div>
+          </div>
+          <span class="estado-badge estado-${s.estado}">${estadoSesionLabel(s.estado)}</span>
+        </div>
+        <div class="sesion-meta">
+          ${s.fecha} · ${s.horaInicio}${s.horaFin?' – '+s.horaFin:' – en curso'} ·
+          Cliente ${estadoClienteLabel(s.estadoCliente)} · Registró: ${s.recepcionista}
+        </div>
+        ${s.observaciones?`<div class="sesion-obs">${s.observaciones}</div>`:''}
+        ${s.estado==='anulada'?`<div class="sesion-obs">Anulada por ${s.anuladoPor}: ${s.motivoAnulacion}</div>`:''}
+      </div>`).join('');
+  } catch(e){ cont.innerHTML='<div class="empty">Error al buscar</div>'; }
+};
+
+
+// ------------------------------------------------------------
+// AUDITORÍA — nunca se borra nada; toda alta, edición o anulación
+// queda registrada acá con usuario, fecha y motivo.
+// ------------------------------------------------------------
+async function registrarAuditoria(entidad, entidadId, entidadNombre, cambio, motivo){
+  try{
+    await setDoc(doc(collection(db,'auditoria_pt')),{
+      entidad, entidadId, entidadNombre, usuario:currentUser.name,
+      fecha:fechaHoy(), hora:horaActual(), cambio, motivo:motivo||'',
+      sucursal:currentSuc, timestamp:tsAhora(),
+    });
+  } catch(e){ /* la auditoría no debe frenar la operación principal */ }
+}
+
+async function renderAuditoriaPT(){
+  const cont = document.getElementById('pt-auditoria-container');
+  cont.innerHTML = '<div class="empty">Cargando...</div>';
+  try{
+    const snap = await getDocs(query(collection(db,'auditoria_pt')));
+    const lista = snap.docs.map(d=>d.data()).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0)).slice(0,150);
+    if(!lista.length){ cont.innerHTML='<div class="empty">Sin movimientos registrados todavía</div>'; return; }
+    cont.innerHTML = lista.map(a=>`
+      <div class="auditoria-row">
+        <div>
+          <div class="auditoria-cambio"><strong>${a.entidadNombre}</strong> — ${a.cambio}${a.motivo?': '+a.motivo:''}</div>
+          <div class="auditoria-meta">${a.usuario} · ${a.fecha} ${a.hora||''} · ${a.entidad}</div>
+        </div>
+      </div>`).join('');
+  } catch(e){ cont.innerHTML='<div class="empty">Error al cargar</div>'; }
+}
+
+// ------------------------------------------------------------
+// INDICADORES + CONTROLES AUTOMÁTICOS + RANKING
+// ------------------------------------------------------------
+async function renderIndicadoresPT(){
+  const cont = document.getElementById('pt-indicadores-container');
+  cont.innerHTML = `
+    <div class="pt-filtros">
+      <select id="pt-periodo" onchange="cargarIndicadoresPT()">
+        <option value="hoy">Hoy</option>
+        <option value="semana">Últimos 7 días</option>
+        <option value="mes" selected>Este mes</option>
+      </select>
+      <select id="pt-filtro-entrenador" onchange="cargarIndicadoresPT()">
+        <option value="">Todos los entrenadores</option>
+        ${entrenadoresData.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('')}
+      </select>
+    </div>
+    <div id="pt-indicadores-resultado"><div class="empty">Cargando...</div></div>`;
+  await cargarIndicadoresPT();
+}
+
+window.cargarIndicadoresPT = async function(){
+  const cont = document.getElementById('pt-indicadores-resultado');
+  const periodo = document.getElementById('pt-periodo').value;
+  const filtroEnt = document.getElementById('pt-filtro-entrenador').value;
+  cont.innerHTML = '<div class="empty">Cargando...</div>';
+  try{
+    const hoy = fechaHoy();
+    const desde = periodo==='hoy' ? hoy
+      : periodo==='semana' ? fechaLocal(new Date(Date.now()-6*86400000))
+      : mesActual()+'-01';
+
+    const snap = await getDocs(query(collection(db,'sesiones_pt'), where('sucursal','==',currentSuc)));
+    let sesiones = snap.docs.map(d=>({id:d.id,...d.data()})).filter(s=>s.fecha>=desde);
+    if(filtroEnt) sesiones = sesiones.filter(s=>s.entrenadorId===filtroEnt);
+
+    // Chequeo cruzado de sucursal (para detectar entrenadores que se
+    // mueven de una sucursal a otra el mismo día) — necesita ver TODAS
+    // las sucursales, no solo la actual.
+    let sesionesHoyTodas = [];
+    try{
+      const snapHoy = await getDocs(query(collection(db,'sesiones_pt'), where('fecha','==',hoy)));
+      sesionesHoyTodas = snapHoy.docs.map(d=>d.data());
+    }catch(e){}
+
+    renderResultadoIndicadoresPT(cont, sesiones, sesionesHoyTodas, desde, hoy);
+  } catch(e){ cont.innerHTML='<div class="empty">Error al cargar</div>'; }
+};
+
+function renderResultadoIndicadoresPT(cont, sesiones, sesionesHoyTodas, desde, hoy){
+  const validas = sesiones.filter(s=>s.estado!=='anulada');
+  const horasTotales = validas.reduce((acc,s)=>acc+duracionHoras(s.horaInicio,s.horaFin),0);
+  const clientesUnicos = new Set(validas.map(s=>(s.cliente||'').trim().toLowerCase())).size;
+  const entrenadoresConSesion = new Set(validas.map(s=>s.entrenadorId)).size;
+  const diasDistintos = new Set(validas.map(s=>s.fecha)).size || 1;
+  const promedioDiario = (validas.length/diasDistintos).toFixed(1);
+
+  // Ranking por entrenador
+  const porEntrenador = {};
+  validas.forEach(s=>{
+    const k=s.entrenadorNombre||'—';
+    porEntrenador[k] = porEntrenador[k] || {sesiones:0, horas:0, clientes:new Set()};
+    porEntrenador[k].sesiones++;
+    porEntrenador[k].horas += duracionHoras(s.horaInicio,s.horaFin);
+    porEntrenador[k].clientes.add((s.cliente||'').trim().toLowerCase());
+  });
+  const ranking = Object.entries(porEntrenador).sort((a,b)=>b[1].sesiones-a[1].sesiones).slice(0,10);
+
+  // Clientes recurrentes (2 o más sesiones en el período)
+  const porCliente = {};
+  validas.forEach(s=>{
+    const k=(s.cliente||'—').trim();
+    porCliente[k]=(porCliente[k]||0)+1;
+  });
+  const recurrentes = Object.entries(porCliente).filter(([,n])=>n>1).length;
+
+  // --- Controles automáticos ---
+  const alertas = [];
+
+  // Entrenador no autorizado con sesiones
+  validas.forEach(s=>{
+    const e = entrenadoresData.find(x=>x.id===s.entrenadorId);
+    if(e && e.estado!=='activo'){
+      alertas.push(`<b>${s.entrenadorNombre}</b> tiene una sesión con ${s.cliente} (${s.fecha}) pero su estado es "${estadoEntrenadorLabel(e.estado)}", no autorizado.`);
+    }
+    if(e && e.vigenciaHasta && e.vigenciaHasta < s.fecha){
+      alertas.push(`<b>${s.entrenadorNombre}</b> dio una sesión el ${s.fecha} con la autorización ya vencida (${e.vigenciaHasta}).`);
+    }
+  });
+
+  // Sesiones sin cerrar hace más de 3 horas (permanencia excesiva)
+  sesionesHoyData.filter(s=>s.estado==='en_curso').forEach(s=>{
+    const dur = duracionHoras(s.horaInicio, horaActual());
+    if(dur>3){
+      alertas.push(`<b>${s.entrenadorNombre}</b> tiene una sesión con ${s.cliente} abierta hace más de ${dur.toFixed(1)}h sin finalizar.`);
+    }
+  });
+
+  // Solapamiento de horario (mismo entrenador, mismo día, rangos que se cruzan)
+  const porEntDia = {};
+  validas.forEach(s=>{
+    const k=`${s.entrenadorId}_${s.fecha}`;
+    (porEntDia[k]=porEntDia[k]||[]).push(s);
+  });
+  Object.values(porEntDia).forEach(list=>{
+    for(let i=0;i<list.length;i++) for(let j=i+1;j<list.length;j++){
+      const a=list[i], b=list[j];
+      if(a.horaInicio && b.horaInicio && a.horaFin && b.horaFin && a.horaInicio<b.horaFin && b.horaInicio<a.horaFin){
+        alertas.push(`<b>${a.entrenadorNombre}</b> tiene 2 sesiones que se cruzan en horario el ${a.fecha}: ${a.cliente} (${a.horaInicio}–${a.horaFin}) y ${b.cliente} (${b.horaInicio}–${b.horaFin}).`);
+      }
+    }
+  });
+
+  // Cliente con más de un entrenador el mismo día
+  const porClienteDia = {};
+  validas.forEach(s=>{
+    const k=`${(s.cliente||'').trim().toLowerCase()}_${s.fecha}`;
+    (porClienteDia[k]=porClienteDia[k]||new Set()).add(s.entrenadorNombre);
+  });
+  Object.entries(porClienteDia).forEach(([k,ents])=>{
+    if(ents.size>1){
+      const [cliente,fecha]=k.split('_');
+      alertas.push(`El cliente <b>${cliente}</b> aparece con ${ents.size} entrenadores distintos el ${fecha}.`);
+    }
+  });
+
+  // Muchas sesiones seguidas de un mismo entrenador en un día
+  const porEntDiaCount = {};
+  validas.forEach(s=>{ const k=`${s.entrenadorNombre}_${s.fecha}`; porEntDiaCount[k]=(porEntDiaCount[k]||0)+1; });
+  Object.entries(porEntDiaCount).forEach(([k,n])=>{
+    if(n>6){ const [ent,fecha]=k.split('_'); alertas.push(`<b>${ent}</b> registró ${n} sesiones el ${fecha} — revisar si es correcto.`); }
+  });
+
+  // Entrenador en más de una sucursal el mismo día
+  const porEntSucHoy = {};
+  sesionesHoyTodas.forEach(s=>{
+    (porEntSucHoy[s.entrenadorNombre]=porEntSucHoy[s.entrenadorNombre]||new Set()).add(s.sucursal);
+  });
+  Object.entries(porEntSucHoy).forEach(([ent,sucs])=>{
+    if(sucs.size>1) alertas.push(`<b>${ent}</b> tiene sesiones hoy en ${sucs.size} sucursales distintas: ${[...sucs].join(', ')}.`);
+  });
+
+  cont.innerHTML = `
+    <div class="pt-kpi-grid">
+      <div class="pt-kpi-card"><div class="pt-kpi-num">${validas.length}</div><div class="pt-kpi-label">Sesiones</div></div>
+      <div class="pt-kpi-card"><div class="pt-kpi-num">${horasTotales.toFixed(1)}h</div><div class="pt-kpi-label">Horas trabajadas</div></div>
+      <div class="pt-kpi-card"><div class="pt-kpi-num">${clientesUnicos}</div><div class="pt-kpi-label">Clientes atendidos</div></div>
+      <div class="pt-kpi-card"><div class="pt-kpi-num">${entrenadoresConSesion}</div><div class="pt-kpi-label">Entrenadores activos</div></div>
+      <div class="pt-kpi-card"><div class="pt-kpi-num">${promedioDiario}</div><div class="pt-kpi-label">Sesiones / día (prom.)</div></div>
+      <div class="pt-kpi-card"><div class="pt-kpi-num">${recurrentes}</div><div class="pt-kpi-label">Clientes recurrentes</div></div>
+    </div>
+
+    ${alertas.length?`
+      <div class="section-title">⚠ Controles automáticos <span></span></div>
+      ${alertas.slice(0,20).map(a=>`<div class="alerta-auto"><span class="icono">⚠</span><span>${a}</span></div>`).join('')}
+    `:`<div class="section-title">⚠ Controles automáticos <span></span></div><div class="empty">Sin anomalías detectadas en el período</div>`}
+
+    <div class="section-title">Ranking de entrenadores <span></span></div>
+    ${ranking.length?ranking.map(([nombre,d],i)=>`
+      <div class="ranking-row">
+        <div class="ranking-pos">${i+1}</div>
+        <div class="ranking-nombre">${nombre}</div>
+        <div class="ranking-num">${d.sesiones} sesiones · ${d.horas.toFixed(1)}h · ${d.clientes.size} clientes</div>
+      </div>`).join(''):'<div class="empty">Sin datos en el período</div>'}
+  `;
+}
