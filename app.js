@@ -175,6 +175,7 @@ async function loadDash(){
       {id:'panel-aerobicos', label:'Aeróbicos'},
       {id:'panel-spinning',  label:'Spinning'},
       {id:'panel-pt',        label:'Entrenadores PT'},
+      {id:'panel-agenda',    label:'Agenda'},
       {id:'panel-alertas',   label:'Alertas'},
       {id:'panel-admin',     label:'Usuarios'},
     ];
@@ -193,7 +194,7 @@ async function loadDash(){
     ];
   }
 
-  const allPanels=['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin','panel-aerobicos','panel-spinning','panel-pt'];
+  const allPanels=['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin','panel-aerobicos','panel-spinning','panel-pt','panel-agenda'];
   allPanels.forEach(p=>document.getElementById(p).classList.remove('active'));
 
   const tabsEl=document.getElementById('tabs-container');
@@ -217,6 +218,7 @@ async function loadDash(){
       if(t.id==='panel-revision')   renderRevision();
       if(t.id==='panel-alertas')    cargarAlertas();
       if(t.id==='panel-pt')        initPTPanel();
+      if(t.id==='panel-agenda')    initAgendaPanel();
       if(t.id==='panel-admin')      cargarUsuarios();
       if(t.id==='panel-aerobicos')  initClasesPanel('aerobicos');
       if(t.id==='panel-spinning')   initClasesPanel('spinning');
@@ -1666,7 +1668,7 @@ setInterval(async ()=>{
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260727e';
+const APP_VERSION = '20260727f';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
@@ -2226,3 +2228,182 @@ function renderResultadoIndicadoresPT(cont, sesiones, sesionesHoyTodas, desde, h
       </div>`).join(''):'<div class="empty">Sin datos en el período</div>'}
   `;
 }
+
+// ============================================================
+// AGENDA / CALENDARIO (solo supervisor)
+// Visitas, recordatorios, compras, llamadas, reuniones y
+// seguimientos, con vista de calendario mensual + lista de
+// próximos eventos. Nunca se borran eventos: se marcan como
+// completados o cancelados, quedando en el historial.
+// ============================================================
+let agendaEventos = [];
+let mesAgendaActual = new Date();
+let diaSeleccionadoAgenda = null; // 'YYYY-MM-DD' o null (= vista "próximos")
+
+const TIPO_EVENTO_LABEL = {
+  visita:'🏢 Visita', recordatorio:'🔔 Recordatorio', compra:'🛒 Compra',
+  llamada:'📞 Llamada', reunion:'🤝 Reunión', seguimiento:'📌 Seguimiento',
+};
+const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DIAS_SEMANA_MINI = ['D','L','M','M','J','V','S'];
+
+window.initAgendaPanel = async function(){
+  document.getElementById('agenda-filtro-suc').innerHTML =
+    `<option value="">Todas las sucursales</option>` + SUCURSALES.map(s=>`<option value="${s}">${s}</option>`).join('');
+
+  showLoading();
+  try{
+    const snap = await getDocs(collection(db,'agenda_eventos'));
+    agendaEventos = snap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e){ agendaEventos=[]; showToast('Error al cargar la agenda','err'); }
+  hideLoading();
+
+  mesAgendaActual = new Date();
+  diaSeleccionadoAgenda = null;
+  renderCalendarioAgenda();
+  renderAgenda();
+};
+
+window.cambiarMesAgenda = function(delta){
+  mesAgendaActual.setMonth(mesAgendaActual.getMonth()+delta);
+  diaSeleccionadoAgenda = null;
+  renderCalendarioAgenda();
+  renderAgenda();
+};
+
+function filtrarEventosAgenda(lista){
+  const tipo = document.getElementById('agenda-filtro-tipo')?.value || '';
+  const suc  = document.getElementById('agenda-filtro-suc')?.value || '';
+  return lista.filter(e=>{
+    if(tipo && e.tipo!==tipo) return false;
+    if(suc && e.sucursal!==suc) return false;
+    return true;
+  });
+}
+
+function renderCalendarioAgenda(){
+  const year=mesAgendaActual.getFullYear(), month=mesAgendaActual.getMonth();
+  document.getElementById('cal-mes-label').textContent = `${MESES_NOMBRE[month]} ${year}`;
+  const primerDia = new Date(year, month, 1).getDay();
+  const diasEnMes = new Date(year, month+1, 0).getDate();
+  const hoy = fechaHoy();
+  const fechasConEventos = new Set(filtrarEventosAgenda(agendaEventos).map(e=>e.fecha));
+
+  let html = DIAS_SEMANA_MINI.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  for(let i=0;i<primerDia;i++) html += `<div class="cal-day cal-day-empty"></div>`;
+  for(let d=1; d<=diasEnMes; d++){
+    const fechaStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const clases = ['cal-day'];
+    if(fechaStr===hoy) clases.push('cal-day-hoy');
+    if(fechaStr===diaSeleccionadoAgenda) clases.push('cal-day-sel');
+    html += `<div class="${clases.join(' ')}" onclick="seleccionarDiaAgenda('${fechaStr}')">
+      <span>${d}</span>${fechasConEventos.has(fechaStr)?'<span class="cal-dot"></span>':''}
+    </div>`;
+  }
+  document.getElementById('cal-grid').innerHTML = html;
+}
+
+window.seleccionarDiaAgenda = function(fechaStr){
+  diaSeleccionadoAgenda = (diaSeleccionadoAgenda===fechaStr) ? null : fechaStr;
+  renderCalendarioAgenda();
+  renderAgenda();
+};
+
+window.renderAgenda = function(){
+  renderCalendarioAgenda();
+  const cont = document.getElementById('agenda-lista');
+  const hoy = fechaHoy();
+  let lista = filtrarEventosAgenda(agendaEventos);
+
+  if(diaSeleccionadoAgenda){
+    lista = lista.filter(e=>e.fecha===diaSeleccionadoAgenda);
+  } else {
+    // Vista "próximos": lo pendiente (incluso vencido, para no perderlo
+    // de vista) + lo que todavía está por venir.
+    lista = lista.filter(e=> e.estado==='pendiente' || e.fecha>=hoy);
+  }
+  lista.sort((a,b)=> (a.fecha+'_'+(a.hora||'99:99')).localeCompare(b.fecha+'_'+(b.hora||'99:99')));
+
+  if(!lista.length){ cont.innerHTML='<div class="empty">Sin eventos para mostrar</div>'; return; }
+
+  cont.innerHTML = lista.map(e=>{
+    const vencido = e.estado==='pendiente' && e.fecha<hoy;
+    return `
+    <div class="evento-card ${vencido?'evento-vencido':''} ${e.estado!=='pendiente'?'evento-resuelto':''}">
+      <div class="evento-top">
+        <div>
+          <div class="evento-titulo">${TIPO_EVENTO_LABEL[e.tipo]||e.tipo} — ${e.titulo}</div>
+          <div class="evento-meta">${e.fecha}${e.hora?' · '+e.hora:''} · ${e.sucursal||'Todas las sucursales'}</div>
+        </div>
+        ${e.prioridad==='alta'?'<span class="estado-badge estado-cancelada">Alta</span>':''}
+      </div>
+      ${e.descripcion?`<div class="evento-desc">${e.descripcion}</div>`:''}
+      ${vencido?'<div class="alerta-msg">⚠ Vencido, sin resolver</div>':''}
+      ${e.estado!=='pendiente'?`<div class="check-meta">${e.estado==='completado'?'✓ Completado':'Cancelado'} por ${e.resueltoPor||''}</div>`:''}
+      <div class="report-actions">
+        ${e.estado==='pendiente'?`
+          <button class="btn-sm btn-atend" onclick="resolverEvento('${e.id}','completado')">✓ Completar</button>
+          <button class="btn-sm btn-defer" onclick="abrirModalEvento('${e.id}')">Editar</button>
+          <button class="btn-sm btn-noatend" onclick="resolverEvento('${e.id}','cancelado')">Cancelar</button>
+        `:''}
+      </div>
+    </div>`;
+  }).join('');
+};
+
+window.abrirModalEvento = function(id){
+  const e = id ? agendaEventos.find(x=>x.id===id) : null;
+  document.getElementById('evento-id-edit').value = id||'';
+  document.getElementById('modal-evento-titulo').textContent = e?'Editar evento':'Nuevo evento';
+  document.getElementById('evento-tipo').value = e?e.tipo:'visita';
+  document.getElementById('evento-titulo').value = e?e.titulo:'';
+  document.getElementById('evento-fecha').value = e?e.fecha:(diaSeleccionadoAgenda||fechaHoy());
+  document.getElementById('evento-hora').value = e?(e.hora||''):'';
+  document.getElementById('evento-sucursal').innerHTML =
+    `<option value="">Todas las sucursales</option>` + SUCURSALES.map(s=>`<option value="${s}">${s}</option>`).join('');
+  document.getElementById('evento-sucursal').value = e?(e.sucursal||''):(currentSuc||'');
+  document.getElementById('evento-prioridad').value = e?e.prioridad:'normal';
+  document.getElementById('evento-desc').value = e?(e.descripcion||''):'';
+  document.getElementById('modal-evento').classList.add('open');
+};
+
+window.guardarEvento = async function(){
+  const id = document.getElementById('evento-id-edit').value;
+  const tipo = document.getElementById('evento-tipo').value;
+  const titulo = document.getElementById('evento-titulo').value.trim();
+  const fecha = document.getElementById('evento-fecha').value;
+  const hora = document.getElementById('evento-hora').value;
+  const sucursal = document.getElementById('evento-sucursal').value;
+  const prioridad = document.getElementById('evento-prioridad').value;
+  const descripcion = document.getElementById('evento-desc').value.trim();
+  if(!titulo || !fecha){ showToast('Completa el título y la fecha','err'); return; }
+  showLoading();
+  try{
+    const data = { tipo, titulo, fecha, hora, sucursal, prioridad, descripcion };
+    if(id){
+      await updateDoc(doc(db,'agenda_eventos',id), data);
+    } else {
+      await setDoc(doc(collection(db,'agenda_eventos')), {
+        ...data, estado:'pendiente', creadoPor:currentUser.name, creadoEn:new Date().toISOString(),
+      });
+    }
+    closeModal('modal-evento');
+    showToast('Evento guardado');
+    await initAgendaPanel();
+  } catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
+};
+
+// Nunca se borran eventos — solo se marcan como completados o
+// cancelados, quedando siempre en el historial de la agenda.
+window.resolverEvento = async function(id, nuevoEstado){
+  showLoading();
+  try{
+    await updateDoc(doc(db,'agenda_eventos',id),{
+      estado:nuevoEstado, resueltoPor:currentUser.name, resueltoEn:new Date().toISOString(),
+    });
+    showToast(nuevoEstado==='completado'?'Marcado como completado':'Evento cancelado');
+    await initAgendaPanel();
+  } catch(e){ showToast('Error','err'); }
+  hideLoading();
+};

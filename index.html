@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260727e">
+<link rel="stylesheet" href="styles.css?v=20260727f">
 </head>
 <body>
 
@@ -147,6 +147,69 @@
       <div id="pt-indicadores-container" style="display:none"></div>
       <div id="pt-historial-container" style="display:none"></div>
       <div id="pt-auditoria-container" style="display:none"></div>
+    </div>
+
+    <div id="panel-agenda" class="panel">
+      <div class="clases-toolbar">
+        <button class="btn-asignar" onclick="abrirModalEvento()">+ Nuevo evento</button>
+        <select id="agenda-filtro-tipo" onchange="renderAgenda()">
+          <option value="">Todos los tipos</option>
+          <option value="visita">🏢 Visita</option>
+          <option value="recordatorio">🔔 Recordatorio</option>
+          <option value="compra">🛒 Compra</option>
+          <option value="llamada">📞 Llamada</option>
+          <option value="reunion">🤝 Reunión</option>
+          <option value="seguimiento">📌 Seguimiento</option>
+        </select>
+        <select id="agenda-filtro-suc" onchange="renderAgenda()">
+          <option value="">Todas las sucursales</option>
+        </select>
+      </div>
+      <div class="agenda-layout">
+        <div class="agenda-cal">
+          <div class="cal-nav">
+            <button class="cal-nav-btn" onclick="cambiarMesAgenda(-1)">‹</button>
+            <div class="cal-mes-label" id="cal-mes-label"></div>
+            <button class="cal-nav-btn" onclick="cambiarMesAgenda(1)">›</button>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+        <div class="agenda-lista" id="agenda-lista"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVO/EDITAR EVENTO DE AGENDA -->
+<div class="modal-overlay" id="modal-evento">
+  <div class="modal">
+    <div class="modal-title" id="modal-evento-titulo">Nuevo evento</div>
+    <input type="hidden" id="evento-id-edit">
+    <div class="field"><label>Tipo</label>
+      <select id="evento-tipo">
+        <option value="visita">🏢 Visita</option>
+        <option value="recordatorio">🔔 Recordatorio</option>
+        <option value="compra">🛒 Compra</option>
+        <option value="llamada">📞 Llamada</option>
+        <option value="reunion">🤝 Reunión</option>
+        <option value="seguimiento">📌 Seguimiento</option>
+      </select>
+    </div>
+    <div class="field"><label>Título</label><input type="text" id="evento-titulo" placeholder="Ej: Revisar cotización de neones"></div>
+    <div class="field-row">
+      <div class="field"><label>Fecha</label><input type="date" id="evento-fecha"></div>
+      <div class="field"><label>Hora (opcional)</label><input type="time" id="evento-hora"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Sucursal</label><select id="evento-sucursal"></select></div>
+      <div class="field"><label>Prioridad</label>
+        <select id="evento-prioridad"><option value="normal">Normal</option><option value="alta">Alta</option></select>
+      </div>
+    </div>
+    <div class="field"><label>Descripción (opcional)</label><textarea id="evento-desc" placeholder="Detalle adicional..."></textarea></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-evento')">Cancelar</button>
+      <button class="btn-send" onclick="guardarEvento()">Guardar</button>
     </div>
   </div>
 </div>
@@ -453,7 +516,7 @@
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20260727e"></script>
+<script type="module" src="app.js?v=20260727f"></script>
 <!-- VISOR DE FOTO A PANTALLA COMPLETA (con zoom y forma clara de salir) -->
 <div class="modal-overlay" id="modal-foto-viewer" onclick="if(event.target===this) cerrarFotoGrande()">
   <div class="foto-viewer-content">
