@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260728c">
+<link rel="stylesheet" href="styles.css?v=20260728d">
 </head>
 <body>
 
@@ -80,6 +80,7 @@
     </div>
   </div>
   <div class="dash-body">
+    <div class="categorias" id="categorias-container" style="display:none"></div>
     <div class="tabs" id="tabs-container"></div>
     <div id="panel-checklist" class="panel"><div id="checklist-container"></div></div>
     <div id="panel-revision" class="panel">
@@ -781,7 +782,7 @@
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20260728c"></script>
+<script type="module" src="app.js?v=20260728d"></script>
 <!-- VISOR DE FOTO A PANTALLA COMPLETA (con zoom y forma clara de salir) -->
 <div class="modal-overlay" id="modal-foto-viewer" onclick="if(event.target===this) cerrarFotoGrande()">
   <div class="foto-viewer-content">

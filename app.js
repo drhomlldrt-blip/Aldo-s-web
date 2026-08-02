@@ -152,6 +152,57 @@ document.getElementById('inp-pass').addEventListener('keydown',e=>{ if(e.key==='
 // ============================================================
 // DASHBOARD
 // ============================================================
+// ============================================================
+// NAVEGACIÓN EN 2 NIVELES (supervisor): categoría → sub-pestañas.
+// Recepción y limpieza siguen con la barra simple de siempre,
+// ya que tienen pocas pestañas y no lo necesitan.
+// ============================================================
+window.seleccionarCategoria = function(catId, silencioso){
+  const categorias = window._categoriasDash || [];
+  const cat = categorias.find(c=>c.id===catId);
+  if(!cat) return;
+  document.querySelectorAll('.categoria-btn').forEach(b=>b.classList.toggle('active', b.dataset.cat===catId));
+  renderTabsEnBarra(cat.tabs, true);
+};
+
+function renderTabsEnBarra(tabs, activarPrimera){
+  const tabsEl = document.getElementById('tabs-container');
+  tabsEl.innerHTML='';
+  tabs.forEach((t,i)=>{
+    const el=document.createElement('div');
+    el.className='tab'+(activarPrimera && i===0?' active':'');
+    el.dataset.panel=t.id;
+    if(t.id==='panel-reportes' && currentUser.role==='limpieza'){
+      el.innerHTML = `${t.label} <span class="tab-badge" id="tab-badge-reportes" style="display:none">0</span>`;
+    } else {
+      el.textContent=t.label;
+    }
+    el.onclick=()=>activarPanelTab(t.id);
+    tabsEl.appendChild(el);
+  });
+  if(activarPrimera && tabs.length) activarPanelTab(tabs[0].id, true);
+}
+
+// Centraliza qué hay que cargar/refrescar según la pestaña elegida,
+// para no repetir esta lista en cada lugar que activa una pestaña.
+function activarPanelTab(panelId, siloso){
+  const allPanels = window._allPanelsDash || [];
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.panel===panelId));
+  allPanels.forEach(p=>document.getElementById(p).classList.remove('active'));
+  const panelEl = document.getElementById(panelId);
+  if(panelEl) panelEl.classList.add('active');
+  guardarPanelActivo(panelId);
+  if(panelId==='panel-historial')  cargarHistorial();
+  if(panelId==='panel-revision')   renderRevision();
+  if(panelId==='panel-alertas')    cargarAlertas();
+  if(panelId==='panel-pt')         initPTPanel();
+  if(panelId==='panel-agenda')     initAgendaPanel();
+  if(panelId==='panel-ops')        initOpsPanel();
+  if(panelId==='panel-admin')      cargarUsuarios();
+  if(panelId==='panel-aerobicos')  initClasesPanel('aerobicos');
+  if(panelId==='panel-spinning')   initClasesPanel('spinning');
+}
+
 async function loadDash(){
   document.getElementById('dash-suc').textContent  = currentSuc;
   document.getElementById('dash-user').textContent = currentUser.name;
@@ -166,19 +217,29 @@ async function loadDash(){
   if(btnSup) btnSup.style.display = currentUser.role==='supervisor' ? 'block' : 'none';
 
   let tabs = [];
+  let categorias = null;
+
   if(currentUser.role==='supervisor'){
-    tabs=[
-      {id:'panel-checklist', label:'Checklist',       grupo:'op'},
-      {id:'panel-reportes',  label:'Reportes',        grupo:'op'},
-      {id:'panel-revision',  label:'Revisión áreas',  grupo:'op'},
-      {id:'panel-historial', label:'Historial',       grupo:'op'},
-      {id:'panel-aerobicos', label:'Aeróbicos',       grupo:'clases'},
-      {id:'panel-spinning',  label:'Spinning',        grupo:'clases'},
-      {id:'panel-pt',        label:'Entrenadores PT', grupo:'gestion'},
-      {id:'panel-agenda',    label:'Agenda',          grupo:'gestion'},
-      {id:'panel-ops',       label:'Operaciones',     grupo:'gestion'},
-      {id:'panel-alertas',   label:'Alertas',         grupo:'sistema'},
-      {id:'panel-admin',     label:'Usuarios',        grupo:'sistema'},
+    categorias = [
+      {id:'limpieza', label:'🧹 Control de Limpieza', tabs:[
+        {id:'panel-checklist', label:'Checklist'},
+        {id:'panel-reportes',  label:'Reportes'},
+        {id:'panel-revision',  label:'Revisión áreas'},
+        {id:'panel-historial', label:'Historial'},
+      ]},
+      {id:'clases', label:'🏋 Aeróbicos y Spinning', tabs:[
+        {id:'panel-aerobicos', label:'Aeróbicos'},
+        {id:'panel-spinning',  label:'Spinning'},
+      ]},
+      {id:'pt', label:'👤 Entrenadores PT', tabs:[
+        {id:'panel-pt', label:'Entrenadores PT'},
+      ]},
+      {id:'admin', label:'⚙ Administración', tabs:[
+        {id:'panel-agenda',  label:'Agenda'},
+        {id:'panel-ops',     label:'Operaciones'},
+        {id:'panel-alertas', label:'Alertas'},
+        {id:'panel-admin',   label:'Usuarios'},
+      ]},
     ];
   } else if(currentUser.role==='recepcionista'){
     tabs=[
@@ -197,45 +258,22 @@ async function loadDash(){
 
   const allPanels=['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin','panel-aerobicos','panel-spinning','panel-pt','panel-agenda','panel-ops'];
   allPanels.forEach(p=>document.getElementById(p).classList.remove('active'));
+  window._allPanelsDash = allPanels;
 
-  const tabsEl=document.getElementById('tabs-container');
-  tabsEl.innerHTML='';
-  let grupoAnterior=null;
-  tabs.forEach((t,i)=>{
-    if(t.grupo && grupoAnterior && t.grupo!==grupoAnterior){
-      const div=document.createElement('div');
-      div.className='tab-divider';
-      tabsEl.appendChild(div);
-    }
-    grupoAnterior = t.grupo || grupoAnterior;
-    const el=document.createElement('div');
-    el.className='tab'+(i===0?' active':'');
-    el.dataset.panel=t.id;
-    if(t.id==='panel-reportes' && currentUser.role==='limpieza'){
-      el.innerHTML = `${t.label} <span class="tab-badge" id="tab-badge-reportes" style="display:none">0</span>`;
-    } else {
-      el.textContent=t.label;
-    }
-    el.onclick=()=>{
-      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-      el.classList.add('active');
-      allPanels.forEach(p=>document.getElementById(p).classList.remove('active'));
-      document.getElementById(t.id).classList.add('active');
-      guardarPanelActivo(t.id);
-      if(t.id==='panel-historial')  cargarHistorial();
-      if(t.id==='panel-revision')   renderRevision();
-      if(t.id==='panel-alertas')    cargarAlertas();
-      if(t.id==='panel-pt')        initPTPanel();
-      if(t.id==='panel-agenda')    initAgendaPanel();
-      if(t.id==='panel-ops')       initOpsPanel();
-      if(t.id==='panel-admin')      cargarUsuarios();
-      if(t.id==='panel-aerobicos')  initClasesPanel('aerobicos');
-      if(t.id==='panel-spinning')   initClasesPanel('spinning');
-    };
-    tabsEl.appendChild(el);
-  });
+  const catCont = document.getElementById('categorias-container');
 
-  if(tabs.length) document.getElementById(tabs[0].id).classList.add('active');
+  if(categorias){
+    window._categoriasDash = categorias;
+    catCont.style.display='flex';
+    catCont.innerHTML = categorias.map((c,i)=>
+      `<div class="categoria-btn${i===0?' active':''}" id="cat-btn-${c.id}" data-cat="${c.id}" onclick="seleccionarCategoria('${c.id}')">${c.label}${c.id==='admin'?' <span class="cat-badge" id="cat-badge-admin" style="display:none"></span>':''}</div>`
+    ).join('');
+    seleccionarCategoria(categorias[0].id, true);
+  } else {
+    catCont.style.display='none';
+    catCont.innerHTML='';
+    renderTabsEnBarra(tabs, true);
+  }
 
   turnoVista = currentUser.turno || detectarTurno();
 
@@ -953,6 +991,11 @@ async function cargarAlertas(){
     tabAlertas.style.background=alertas.length>0?'#e84a4a':'';
     tabAlertas.style.color=alertas.length>0?'#fff':'';
   }
+  const catBadge=document.getElementById('cat-badge-admin');
+  if(catBadge){
+    if(alertas.length>0){ catBadge.textContent=alertas.length; catBadge.style.display='inline-flex'; }
+    else catBadge.style.display='none';
+  }
   if(!alertas.length){ cont.innerHTML='<div class="empty">Sin alertas ✓</div>'; return; }
   cont.innerHTML=`
     <div class="alerta-banner">⚠ ${alertas.length} tarea${alertas.length>1?'s':''} sin atender en más de 24 horas</div>
@@ -1636,6 +1679,11 @@ function guardarPanelActivo(panelId){
     await loadDash();
     const panelGuardado = localStorage.getItem(SESSION_PANEL_KEY);
     if(panelGuardado){
+      const categorias = window._categoriasDash;
+      if(categorias){
+        const catDueña = categorias.find(c=>c.tabs.some(t=>t.id===panelGuardado));
+        if(catDueña) seleccionarCategoria(catDueña.id, true);
+      }
       const tabEl = [...document.querySelectorAll('.tab')].find(t=>t.dataset.panel===panelGuardado);
       if(tabEl) tabEl.click();
     }
@@ -1677,7 +1725,7 @@ setInterval(async ()=>{
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260728c';
+const APP_VERSION = '20260728d';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
