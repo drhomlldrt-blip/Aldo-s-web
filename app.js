@@ -168,16 +168,17 @@ async function loadDash(){
   let tabs = [];
   if(currentUser.role==='supervisor'){
     tabs=[
-      {id:'panel-checklist', label:'Checklist'},
-      {id:'panel-reportes',  label:'Reportes'},
-      {id:'panel-revision',  label:'Revisión áreas'},
-      {id:'panel-historial', label:'Historial'},
-      {id:'panel-aerobicos', label:'Aeróbicos'},
-      {id:'panel-spinning',  label:'Spinning'},
-      {id:'panel-pt',        label:'Entrenadores PT'},
-      {id:'panel-agenda',    label:'Agenda'},
-      {id:'panel-alertas',   label:'Alertas'},
-      {id:'panel-admin',     label:'Usuarios'},
+      {id:'panel-checklist', label:'Checklist',       grupo:'op'},
+      {id:'panel-reportes',  label:'Reportes',        grupo:'op'},
+      {id:'panel-revision',  label:'Revisión áreas',  grupo:'op'},
+      {id:'panel-historial', label:'Historial',       grupo:'op'},
+      {id:'panel-aerobicos', label:'Aeróbicos',       grupo:'clases'},
+      {id:'panel-spinning',  label:'Spinning',        grupo:'clases'},
+      {id:'panel-pt',        label:'Entrenadores PT', grupo:'gestion'},
+      {id:'panel-agenda',    label:'Agenda',          grupo:'gestion'},
+      {id:'panel-ops',       label:'Operaciones',     grupo:'gestion'},
+      {id:'panel-alertas',   label:'Alertas',         grupo:'sistema'},
+      {id:'panel-admin',     label:'Usuarios',        grupo:'sistema'},
     ];
   } else if(currentUser.role==='recepcionista'){
     tabs=[
@@ -194,12 +195,19 @@ async function loadDash(){
     ];
   }
 
-  const allPanels=['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin','panel-aerobicos','panel-spinning','panel-pt','panel-agenda'];
+  const allPanels=['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin','panel-aerobicos','panel-spinning','panel-pt','panel-agenda','panel-ops'];
   allPanels.forEach(p=>document.getElementById(p).classList.remove('active'));
 
   const tabsEl=document.getElementById('tabs-container');
   tabsEl.innerHTML='';
+  let grupoAnterior=null;
   tabs.forEach((t,i)=>{
+    if(t.grupo && grupoAnterior && t.grupo!==grupoAnterior){
+      const div=document.createElement('div');
+      div.className='tab-divider';
+      tabsEl.appendChild(div);
+    }
+    grupoAnterior = t.grupo || grupoAnterior;
     const el=document.createElement('div');
     el.className='tab'+(i===0?' active':'');
     el.dataset.panel=t.id;
@@ -219,6 +227,7 @@ async function loadDash(){
       if(t.id==='panel-alertas')    cargarAlertas();
       if(t.id==='panel-pt')        initPTPanel();
       if(t.id==='panel-agenda')    initAgendaPanel();
+      if(t.id==='panel-ops')       initOpsPanel();
       if(t.id==='panel-admin')      cargarUsuarios();
       if(t.id==='panel-aerobicos')  initClasesPanel('aerobicos');
       if(t.id==='panel-spinning')   initClasesPanel('spinning');
@@ -1668,7 +1677,7 @@ setInterval(async ()=>{
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260727f';
+const APP_VERSION = '20260728c';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
@@ -2405,5 +2414,725 @@ window.resolverEvento = async function(id, nuevoEstado){
     showToast(nuevoEstado==='completado'?'Marcado como completado':'Evento cancelado');
     await initAgendaPanel();
   } catch(e){ showToast('Error','err'); }
+  hideLoading();
+};
+
+// ============================================================
+// OPERACIONES: Dashboard + Incidencias + Bitácora + Checklist
+// operativo (apertura/cierre). Módulo de uso exclusivo del
+// supervisor — centro de control de las 5 sucursales.
+// ============================================================
+let incidenciasData = [];
+let bitacoraData = [];
+let vistaActualOps = 'dashboard';
+let tipoChecklistOpsActual = 'apertura';
+let checklistOpsConfig = {apertura:[], cierre:[]};
+let checklistOpsRegistroHoy = {apertura:{}, cierre:{}};
+let fotosIncidenciaActual = {antes:null, durante:null, despues:null};
+
+const DEFAULT_CHECKLIST_APERTURA = ['Encender neones','Encender música','Revisar baños','Revisar duchas','Revisar recepción','Revisar internet','Encender televisores','Revisar cámaras','Revisar caja','Revisar aromatización'];
+const DEFAULT_CHECKLIST_CIERRE   = ['Apagar equipos','Apagar televisores','Cerrar caja','Apagar luces','Cerrar puertas','Activar alarma'];
+
+function estadoIncidenciaLabel(e){ return {abierta:'Abierta',en_proceso:'En proceso',resuelta:'Resuelta',cancelada:'Cancelada'}[e]||e; }
+function prioridadIncidenciaLabel(p){ return {baja:'Baja',media:'Media',alta:'Alta',critica:'Crítica'}[p]||p; }
+
+async function registrarAuditoriaOps(entidad, entidadId, entidadNombre, cambio, motivo){
+  try{
+    await setDoc(doc(collection(db,'auditoria_ops')),{
+      entidad, entidadId, entidadNombre, usuario:currentUser.name,
+      fecha:fechaHoy(), hora:horaActual(), cambio, motivo:motivo||'',
+      sucursal:currentSuc, timestamp:tsAhora(),
+    });
+  } catch(e){ /* la auditoría no debe frenar la operación principal */ }
+}
+
+// ------------------------------------------------------------
+// Entrada del panel
+// ------------------------------------------------------------
+window.initOpsPanel = async function(){
+  document.getElementById('bitacora-sucursal').innerHTML = SUCURSALES.map(s=>`<option value="${s}" ${s===currentSuc?'selected':''}>${s}</option>`).join('');
+  showLoading();
+  try{
+    const si = await getDocs(collection(db,'incidencias')); // todas las sucursales, para el dashboard ejecutivo
+    incidenciasData = si.docs.map(d=>({id:d.id,...d.data()}));
+    const sb = await getDocs(query(collection(db,'bitacora'), where('sucursal','==',currentSuc)));
+    bitacoraData = sb.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.creadoEn||'').localeCompare(a.creadoEn||''));
+    const sm = await getDocs(query(collection(db,'mantenimientos'), where('sucursal','==',currentSuc)));
+    mantenimientoData = sm.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+    const sg = await getDocs(query(collection(db,'gastos'), where('sucursal','==',currentSuc)));
+    gastosData = sg.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+    const sinsp = await getDocs(query(collection(db,'inspecciones'), where('sucursal','==',currentSuc)));
+    inspeccionesData = sinsp.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.creadoEn||'').localeCompare(a.creadoEn||''));
+  } catch(e){ showToast('Error al cargar operaciones','err'); }
+  hideLoading();
+  cambiarVistaOps('dashboard');
+};
+
+window.cambiarVistaOps = function(vista){
+  vistaActualOps = vista;
+  document.querySelectorAll('#switch-ops .clases-switch-btn').forEach(b=>b.classList.remove('active'));
+  const btn = document.querySelector(`#switch-ops [data-vista="${vista}"]`);
+  if(btn) btn.classList.add('active');
+  ['dashboard','incidencias','bitacora','checklist','inspecciones','mantenimiento','gastos'].forEach(v=>{
+    document.getElementById(`ops-${v}-container`).style.display = v===vista?'block':'none';
+  });
+  document.getElementById('btn-nueva-incidencia').style.display = vista==='incidencias'?'inline-flex':'none';
+  document.getElementById('btn-nueva-bitacora').style.display = vista==='bitacora'?'inline-flex':'none';
+  document.getElementById('btn-editar-checklist-ops').style.display = vista==='checklist'?'inline-flex':'none';
+  document.getElementById('btn-nueva-inspeccion').style.display = vista==='inspecciones'?'inline-flex':'none';
+  document.getElementById('btn-nuevo-mantenimiento').style.display = vista==='mantenimiento'?'inline-flex':'none';
+  document.getElementById('btn-nuevo-gasto').style.display = vista==='gastos'?'inline-flex':'none';
+
+  if(vista==='dashboard')   renderDashboardOps();
+  if(vista==='incidencias') renderIncidencias();
+  if(vista==='bitacora')    renderBitacora();
+  if(vista==='checklist')   cargarChecklistOps();
+  if(vista==='inspecciones')    cargarInspecciones();
+  if(vista==='mantenimiento')   cargarMantenimiento();
+  if(vista==='gastos')          cargarGastos();
+};
+
+// ------------------------------------------------------------
+// DASHBOARD EJECUTIVO
+// ------------------------------------------------------------
+function renderDashboardOps(){
+  const cont = document.getElementById('ops-dashboard-container');
+  const abiertas = incidenciasData.filter(i=>i.estado==='abierta'||i.estado==='en_proceso');
+  const criticas = abiertas.filter(i=>i.prioridad==='critica');
+  const abiertasSuc = incidenciasData.filter(i=>i.sucursal===currentSuc && (i.estado==='abierta'||i.estado==='en_proceso'));
+
+  cont.innerHTML = `
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-top"><span class="stat-label">Incidencias abiertas</span><span class="stat-icon warn">!</span></div><div class="stat-num">${abiertas.length}</div><div class="stat-sub">en las 5 sucursales</div></div>
+      <div class="stat-card"><div class="stat-top"><span class="stat-label">Críticas sin resolver</span><span class="stat-icon warn">⚠</span></div><div class="stat-num">${criticas.length}</div><div class="stat-sub">prioridad más alta</div></div>
+      <div class="stat-card"><div class="stat-top"><span class="stat-label">Abiertas en esta sucursal</span><span class="stat-icon ok">◔</span></div><div class="stat-num">${abiertasSuc.length}</div><div class="stat-sub">${currentSuc}</div></div>
+    </div>
+    <div class="section-title">Incidencias críticas <span></span></div>
+    ${criticas.length?criticas.slice(0,8).map(i=>`
+      <div class="incidencia-card">
+        <div class="incidencia-top">
+          <div><div class="incidencia-titulo">${i.codigo} — ${i.titulo}</div><div class="incidencia-meta">${i.sucursal} · ${i.area} · ${i.fecha}</div></div>
+          <span class="estado-badge estado-${i.estado}">${estadoIncidenciaLabel(i.estado)}</span>
+        </div>
+      </div>`).join(''):'<div class="empty">Sin incidencias críticas abiertas</div>'}
+
+    <div class="section-title">Actividad reciente en bitácora (${currentSuc}) <span></span></div>
+    ${bitacoraData.length?bitacoraData.slice(0,5).map(b=>`
+      <div class="bitacora-row"><div class="bitacora-fecha">${b.fecha} ${b.hora}</div><div class="bitacora-texto">${b.texto}</div><div class="bitacora-autor">— ${b.autor}</div></div>
+    `).join(''):'<div class="empty">Sin entradas todavía en esta sucursal</div>'}
+  `;
+}
+
+// ------------------------------------------------------------
+// INCIDENCIAS — nunca se borran, solo cambian de estado
+// ------------------------------------------------------------
+function siguienteCodigoIncidencia(){
+  const nums = incidenciasData.map(i=>{ const m=(i.codigo||'').match(/(\d+)$/); return m?parseInt(m[1],10):0; });
+  const next = (nums.length?Math.max(...nums):0)+1;
+  return 'INC-'+String(next).padStart(3,'0');
+}
+
+window.renderIncidencias = function(){
+  const cont = document.getElementById('ops-incidencias-lista');
+  const estadoF = document.getElementById('inc-filtro-estado').value;
+  const prioF = document.getElementById('inc-filtro-prioridad').value;
+  let lista = incidenciasData.filter(i=>i.sucursal===currentSuc);
+  if(estadoF) lista = lista.filter(i=>i.estado===estadoF);
+  if(prioF) lista = lista.filter(i=>i.prioridad===prioF);
+  const orden = {critica:0,alta:1,media:2,baja:3};
+  lista.sort((a,b)=> (orden[a.prioridad]-orden[b.prioridad]) || (b.creadoEn||'').localeCompare(a.creadoEn||''));
+
+  if(!lista.length){ cont.innerHTML='<div class="empty">Sin incidencias con estos filtros</div>'; return; }
+
+  cont.innerHTML = lista.map(i=>`
+    <div class="incidencia-card" onclick="abrirModalIncidencia('${i.id}')">
+      <div class="incidencia-top">
+        <div>
+          <div class="incidencia-titulo">${i.codigo} — ${i.titulo}</div>
+          <div class="incidencia-meta">${i.area} · ${i.fecha} · detectado por ${i.detectadoPor}</div>
+        </div>
+        <span class="estado-badge estado-${i.estado}">${estadoIncidenciaLabel(i.estado)}</span>
+      </div>
+      <div class="incidencia-tags">
+        <span class="prioridad-tag prioridad-${i.prioridad}">${prioridadIncidenciaLabel(i.prioridad)}</span>
+        ${i.responsable?`<span class="suc-tag-mini">Resp: ${i.responsable}</span>`:''}
+        ${i.costo?`<span class="suc-tag-mini">Bs ${i.costo}</span>`:''}
+        ${(i.fotoAntes||i.fotoDurante||i.fotoDespues)?'<span class="suc-tag-mini">📷 con fotos</span>':''}
+      </div>
+    </div>`).join('');
+};
+
+window.abrirModalIncidencia = function(id){
+  const i = id ? incidenciasData.find(x=>x.id===id) : null;
+  document.getElementById('incidencia-id-edit').value = id||'';
+  document.getElementById('modal-incidencia-titulo').textContent = i ? `${i.codigo} — Editar` : `Nueva incidencia (${siguienteCodigoIncidencia()})`;
+  document.getElementById('incidencia-area').value = i?i.area:'Recepción';
+  document.getElementById('incidencia-prioridad').value = i?i.prioridad:'media';
+  document.getElementById('incidencia-titulo').value = i?i.titulo:'';
+  document.getElementById('incidencia-desc').value = i?(i.descripcion||''):'';
+  document.getElementById('campo-incidencia-estado').style.display = i?'block':'none';
+  document.getElementById('incidencia-estado').value = i?i.estado:'abierta';
+  document.getElementById('incidencia-responsable').value = i?(i.responsable||''):'';
+  document.getElementById('incidencia-costo').value = i?(i.costo??''):'';
+  document.getElementById('incidencia-proveedor').value = i?(i.proveedor||''):'';
+
+  fotosIncidenciaActual = {antes:i?(i.fotoAntes||null):null, durante:i?(i.fotoDurante||null):null, despues:i?(i.fotoDespues||null):null};
+  ['antes','durante','despues'].forEach(slot=>{
+    const img = document.getElementById(`inc-foto-${slot}-preview`);
+    if(fotosIncidenciaActual[slot]){ img.src=fotosIncidenciaActual[slot]; img.style.display='block'; }
+    else { img.style.display='none'; img.src=''; }
+    document.getElementById(`inc-foto-${slot}-cam`).value='';
+    document.getElementById(`inc-foto-${slot}-gal`).value='';
+  });
+
+  document.getElementById('incidencia-comentarios-bloque').style.display = i?'block':'none';
+  renderComentariosIncidencia(i?(i.comentarios||[]):[]);
+  document.getElementById('incidencia-nuevo-comentario').value='';
+
+  document.getElementById('modal-incidencia').classList.add('open');
+};
+
+function renderComentariosIncidencia(comentarios){
+  const cont = document.getElementById('incidencia-comentarios-lista');
+  if(!comentarios.length){ cont.innerHTML = '<div class="empty" style="padding:8px 0">Sin comentarios</div>'; return; }
+  cont.innerHTML = comentarios.map(c=>`
+    <div class="comentario-row"><strong>${c.autor}</strong> · ${c.fecha} ${c.hora}<div>${c.texto}</div></div>
+  `).join('');
+}
+
+window.agregarComentarioIncidencia = async function(){
+  const id = document.getElementById('incidencia-id-edit').value;
+  if(!id){ showToast('Guarda la incidencia primero','err'); return; }
+  const input = document.getElementById('incidencia-nuevo-comentario');
+  const texto = input.value.trim();
+  if(!texto) return;
+  const i = incidenciasData.find(x=>x.id===id);
+  const comentarios = (i.comentarios||[]).concat([{texto, autor:currentUser.name, fecha:fechaHoy(), hora:horaActual()}]);
+  try{
+    await updateDoc(doc(db,'incidencias',id),{comentarios});
+    i.comentarios = comentarios;
+    renderComentariosIncidencia(comentarios);
+    input.value='';
+    showToast('Comentario agregado');
+  } catch(e){ showToast('Error al agregar comentario','err'); }
+};
+
+window.previewFotoIncidencia = async function(input, slot){
+  if(!input.files || !input.files[0]) return;
+  try{
+    const dataUrl = await comprimirImagen(input.files[0]);
+    fotosIncidenciaActual[slot] = dataUrl;
+    const img = document.getElementById(`inc-foto-${slot}-preview`);
+    img.src = dataUrl; img.style.display='block';
+  } catch(e){ showToast('No se pudo cargar la foto','err'); }
+};
+
+window.guardarIncidencia = async function(){
+  const id = document.getElementById('incidencia-id-edit').value;
+  const area = document.getElementById('incidencia-area').value;
+  const prioridad = document.getElementById('incidencia-prioridad').value;
+  const titulo = document.getElementById('incidencia-titulo').value.trim();
+  const descripcion = document.getElementById('incidencia-desc').value.trim();
+  const estado = document.getElementById('incidencia-estado').value;
+  const responsable = document.getElementById('incidencia-responsable').value.trim();
+  const costoVal = document.getElementById('incidencia-costo').value;
+  const costo = costoVal!==''?Number(costoVal):null;
+  const proveedor = document.getElementById('incidencia-proveedor').value.trim();
+  if(!titulo){ showToast('Escribe un título','err'); return; }
+  showLoading();
+  try{
+    const data = {
+      sucursal: currentSuc, area, prioridad, titulo, descripcion, responsable, costo, proveedor,
+      fotoAntes: fotosIncidenciaActual.antes, fotoDurante: fotosIncidenciaActual.durante, fotoDespues: fotosIncidenciaActual.despues,
+    };
+    if(id){
+      const anterior = incidenciasData.find(x=>x.id===id);
+      await updateDoc(doc(db,'incidencias',id),{...data, estado, actualizadoPor:currentUser.name, actualizadoEn:new Date().toISOString()});
+      const cambio = (anterior && anterior.estado!==estado)
+        ? `Cambió el estado de ${estadoIncidenciaLabel(anterior.estado)} a ${estadoIncidenciaLabel(estado)}`
+        : 'Editó datos de la incidencia';
+      await registrarAuditoriaOps('incidencia', id, `${anterior?anterior.codigo:''} — ${titulo}`, cambio, '');
+    } else {
+      const ref = doc(collection(db,'incidencias'));
+      const codigo = siguienteCodigoIncidencia();
+      await setDoc(ref, {
+        ...data, codigo, estado:'abierta', comentarios:[], detectadoPor:currentUser.name,
+        fecha:fechaHoy(), creadoPor:currentUser.name, creadoEn:new Date().toISOString(),
+      });
+      await registrarAuditoriaOps('incidencia', ref.id, `${codigo} — ${titulo}`, 'Incidencia registrada (alta inicial)', '');
+    }
+    closeModal('modal-incidencia');
+    showToast('Incidencia guardada');
+    await initOpsPanel();
+    cambiarVistaOps('incidencias');
+  } catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
+};
+
+// ------------------------------------------------------------
+// BITÁCORA — diario operativo, cronológico, nunca se edita ni borra
+// ------------------------------------------------------------
+window.renderBitacora = function(){
+  const cont = document.getElementById('ops-bitacora-container');
+  const lista = bitacoraData;
+  if(!lista.length){ cont.innerHTML = '<div class="empty">Sin entradas todavía en esta sucursal</div>'; return; }
+  const porFecha = {};
+  lista.forEach(b=>{ (porFecha[b.fecha]=porFecha[b.fecha]||[]).push(b); });
+  const fechas = Object.keys(porFecha).sort((a,b)=>b.localeCompare(a));
+  cont.innerHTML = fechas.map(f=>`
+    <div class="section-title">${f} <span></span></div>
+    ${porFecha[f].map(b=>`
+      <div class="bitacora-row">
+        <div class="bitacora-fecha">${b.hora}</div>
+        <div class="bitacora-texto">${b.texto}</div>
+        <div class="bitacora-autor">— ${b.autor}</div>
+      </div>`).join('')}
+  `).join('');
+};
+
+window.abrirModalBitacora = function(){
+  document.getElementById('bitacora-sucursal').innerHTML = SUCURSALES.map(s=>`<option value="${s}" ${s===currentSuc?'selected':''}>${s}</option>`).join('');
+  document.getElementById('bitacora-texto').value='';
+  document.getElementById('modal-bitacora').classList.add('open');
+};
+
+window.guardarBitacora = async function(){
+  const sucursal = document.getElementById('bitacora-sucursal').value;
+  const texto = document.getElementById('bitacora-texto').value.trim();
+  if(!texto){ showToast('Escribe qué pasó','err'); return; }
+  showLoading();
+  try{
+    await setDoc(doc(collection(db,'bitacora')),{
+      sucursal, texto, autor:currentUser.name, fecha:fechaHoy(), hora:horaActual(), creadoEn:new Date().toISOString(),
+    });
+    closeModal('modal-bitacora');
+    showToast('Entrada agregada a la bitácora');
+    await initOpsPanel();
+    cambiarVistaOps('bitacora');
+  } catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
+};
+
+// ------------------------------------------------------------
+// CHECKLIST OPERATIVO (apertura/cierre) — reutilizable, editable
+// por sucursal, con registro diario de quién marcó qué y cuándo
+// ------------------------------------------------------------
+window.cambiarTipoChecklistOps = function(tipo){
+  tipoChecklistOpsActual = tipo;
+  document.querySelectorAll('#switch-checklist-ops .clases-switch-btn').forEach(b=>b.classList.remove('active'));
+  const btn = document.querySelector(`#switch-checklist-ops [data-tipo="${tipo}"]`);
+  if(btn) btn.classList.add('active');
+  renderChecklistOps();
+};
+
+window.cargarChecklistOps = async function(){
+  const cont = document.getElementById('ops-checklist-lista');
+  cont.innerHTML = '<div class="empty">Cargando...</div>';
+  try{
+    for(const tipo of ['apertura','cierre']){
+      const ref = doc(db,'checklist_ops_config', `${currentSuc}_${tipo}`);
+      const snap = await getDoc(ref);
+      if(snap.exists()){
+        checklistOpsConfig[tipo] = snap.data().items || [];
+      } else {
+        const defaults = tipo==='apertura'?DEFAULT_CHECKLIST_APERTURA:DEFAULT_CHECKLIST_CIERRE;
+        await setDoc(ref, {items:defaults, sucursal:currentSuc, tipo});
+        checklistOpsConfig[tipo] = defaults;
+      }
+      const regRef = doc(db,'checklist_ops_registro', `${currentSuc}_${tipo}_${fechaHoy()}`);
+      const regSnap = await getDoc(regRef);
+      checklistOpsRegistroHoy[tipo] = regSnap.exists() ? (regSnap.data().items||{}) : {};
+    }
+  } catch(e){ cont.innerHTML='<div class="empty">Error al cargar</div>'; return; }
+  renderChecklistOps();
+};
+
+function renderChecklistOps(){
+  const cont = document.getElementById('ops-checklist-lista');
+  const tipo = tipoChecklistOpsActual;
+  const items = checklistOpsConfig[tipo] || [];
+  const estado = checklistOpsRegistroHoy[tipo] || {};
+  if(!items.length){ cont.innerHTML = '<div class="empty">Sin ítems configurados — tocá "Editar lista"</div>'; return; }
+  const hechos = items.filter((_,i)=>estado[i]?.hecho).length;
+  cont.innerHTML = `
+    <div class="rev-resumen-sup">${hechos} de ${items.length} completados hoy (${fechaHoy()})</div>
+    ${items.map((texto,i)=>{
+      const dat = estado[i]||{};
+      const hecho = dat.hecho||false;
+      return `
+      <div class="check-item ${hecho?'item-done':''}">
+        <input type="checkbox" ${hecho?'checked':''} onchange="marcarChecklistOps(${i},this.checked)">
+        <div class="check-content">
+          <div class="check-label ${hecho?'done':''}">${texto}</div>
+          ${hecho?`<div class="check-meta">✓ ${dat.hora} — ${dat.quien}</div>`:''}
+        </div>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+window.marcarChecklistOps = async function(idx, marcado){
+  const tipo = tipoChecklistOpsActual;
+  checklistOpsRegistroHoy[tipo][idx] = marcado ? {hecho:true, hora:horaActual(), quien:currentUser.name} : {hecho:false};
+  try{
+    await setDoc(doc(db,'checklist_ops_registro', `${currentSuc}_${tipo}_${fechaHoy()}`),{
+      sucursal:currentSuc, tipo, fecha:fechaHoy(), items:checklistOpsRegistroHoy[tipo],
+    });
+  } catch(e){ showToast('Error al guardar','err'); }
+  renderChecklistOps();
+};
+
+window.abrirModalEditarChecklistOps = function(){
+  const tipo = tipoChecklistOpsActual;
+  const items = checklistOpsConfig[tipo] || [];
+  document.getElementById('checklist-ops-edit-tipo').value = tipo;
+  document.getElementById('checklist-ops-edit-textarea').value = items.join('\n');
+  document.getElementById('modal-editar-checklist-ops').classList.add('open');
+};
+
+window.guardarChecklistOpsConfig = async function(){
+  const tipo = document.getElementById('checklist-ops-edit-tipo').value;
+  const texto = document.getElementById('checklist-ops-edit-textarea').value;
+  const items = texto.split('\n').map(t=>t.trim()).filter(Boolean);
+  if(!items.length){ showToast('Agrega al menos un ítem','err'); return; }
+  showLoading();
+  try{
+    await setDoc(doc(db,'checklist_ops_config', `${currentSuc}_${tipo}`), {items, sucursal:currentSuc, tipo});
+    checklistOpsConfig[tipo] = items;
+    closeModal('modal-editar-checklist-ops');
+    showToast('Lista actualizada');
+    renderChecklistOps();
+  } catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
+};
+
+// ============================================================
+// FASE 2 — INSPECCIONES, MANTENIMIENTO Y GASTOS
+// ============================================================
+let inspeccionesData = [];
+let mantenimientoData = [];
+let gastosData = [];
+let inspeccionActual = null; // inspección en curso que se está viendo/llenando
+let fotoMantActual = null;
+let fotoGastoActual = null;
+
+const CATEGORIAS_INSPECCION = [
+  'Recepción','Sala de musculación','Cardio','Peso libre','Baños','Duchas','Vestidores','Casilleros',
+  'Pisos','Techos','Paredes','Pintura','Electricidad','Iluminación','Neones','Letreros','Internet',
+  'Televisores','Sonido','Cámaras','Seguridad','Limpieza','Almacén','Oficina','Exterior',
+];
+const CALIFICACIONES = ['excelente','bueno','regular','malo','critico'];
+const CALIFICACION_LABEL = {excelente:'Excelente',bueno:'Bueno',regular:'Regular',malo:'Malo',critico:'Crítico'};
+
+// ------------------------------------------------------------
+// INSPECCIONES — recorrido por las 25 categorías con calificación
+// de 5 niveles. Las categorías marcadas "Crítico" generan
+// automáticamente una incidencia vinculada (no hay que cargarla
+// dos veces).
+// ------------------------------------------------------------
+function cargarInspecciones(){
+  inspeccionActual = null;
+  renderInspecciones();
+}
+
+window.renderInspecciones = function(){
+  const cont = document.getElementById('ops-inspecciones-container');
+  if(inspeccionActual){ renderDetalleInspeccion(); return; }
+
+  const lista = inspeccionesData;
+  if(!lista.length){ cont.innerHTML='<div class="empty">Sin inspecciones registradas todavía</div>'; return; }
+  cont.innerHTML = lista.map(insp=>{
+    const total = CATEGORIAS_INSPECCION.length;
+    const calificadas = Object.keys(insp.categorias||{}).length;
+    const criticos = Object.values(insp.categorias||{}).filter(c=>c.calificacion==='critico').length;
+    return `
+    <div class="incidencia-card" onclick="abrirInspeccion('${insp.id}')">
+      <div class="incidencia-top">
+        <div>
+          <div class="incidencia-titulo">Inspección ${insp.fecha} ${insp.hora}</div>
+          <div class="incidencia-meta">${insp.administrador} · ${calificadas}/${total} categorías${insp.duracionMin?' · '+insp.duracionMin+' min':''}</div>
+        </div>
+        <span class="estado-badge estado-${insp.estado==='finalizada'?'finalizada':'en_curso'}">${insp.estado==='finalizada'?'Finalizada':'En curso'}</span>
+      </div>
+      ${criticos?`<div class="incidencia-tags"><span class="prioridad-tag prioridad-critica">${criticos} categoría(s) crítica(s)</span></div>`:''}
+    </div>`;
+  }).join('');
+};
+
+window.crearInspeccion = async function(){
+  showLoading();
+  try{
+    const ref = doc(collection(db,'inspecciones'));
+    const data = {
+      sucursal: currentSuc, administrador: currentUser.name,
+      fecha: fechaHoy(), hora: horaActual(), horaInicioTs: tsAhora(),
+      estado: 'en_curso', categorias: {}, creadoEn: new Date().toISOString(),
+    };
+    await setDoc(ref, data);
+    inspeccionesData.unshift({id:ref.id, ...data});
+    inspeccionActual = {id:ref.id, ...data};
+    renderDetalleInspeccion();
+  } catch(e){ showToast('Error al crear la inspección','err'); }
+  hideLoading();
+};
+
+window.abrirInspeccion = function(id){
+  inspeccionActual = inspeccionesData.find(x=>x.id===id);
+  renderDetalleInspeccion();
+};
+
+window.volverListaInspecciones = function(){
+  inspeccionActual = null;
+  renderInspecciones();
+};
+
+function renderDetalleInspeccion(){
+  const cont = document.getElementById('ops-inspecciones-container');
+  const insp = inspeccionActual;
+  const soloLectura = insp.estado==='finalizada';
+  const cat = insp.categorias||{};
+
+  cont.innerHTML = `
+    <button class="btn-link-report" onclick="volverListaInspecciones()">← Volver a inspecciones</button>
+    <div class="rev-resumen-sup">${insp.fecha} ${insp.hora} · ${insp.administrador} · ${Object.keys(cat).length}/${CATEGORIAS_INSPECCION.length} categorías revisadas</div>
+    ${CATEGORIAS_INSPECCION.map(nombre=>{
+      const id = slugArea(nombre);
+      const c = cat[id];
+      const necesitaDetalle = c && (c.calificacion==='regular'||c.calificacion==='malo'||c.calificacion==='critico');
+      return `
+      <div class="area-block">
+        <div class="area-header-rev">
+          <div style="flex:1;min-width:180px">
+            <div class="area-name">${nombre}</div>
+            ${c
+              ? `<div class="rev-marca niv-${c.calificacion==='excelente'||c.calificacion==='bueno'?'bien':'falta'}">${CALIFICACION_LABEL[c.calificacion]}${c.observacion?' — '+c.observacion:''}</div>`
+              : `<div class="rev-marca rev-pendiente">Sin calificar</div>`}
+          </div>
+          ${!soloLectura?`
+          <div class="rev-btns" style="flex-wrap:wrap">
+            ${CALIFICACIONES.map(cal=>`<button class="btn-rev btn-cal-${cal} ${c&&c.calificacion===cal?'activo':''}" onclick="calificarCategoria('${id}','${nombre.replace(/'/g,"\\'")}','${cal}')">${CALIFICACION_LABEL[cal]}</button>`).join('')}
+          </div>`:''}
+        </div>
+        ${!soloLectura && necesitaDetalle ? `
+        <div style="padding:0 16px 14px">
+          <textarea class="obs-input" style="width:100%;min-height:50px" placeholder="¿Qué se encontró? (opcional)"
+            onchange="guardarObsCategoria('${id}',this.value)">${c?.observacion||''}</textarea>
+        </div>`:''}
+      </div>`;
+    }).join('')}
+    ${!soloLectura?`<button class="btn-send" style="width:100%;margin-top:10px" onclick="finalizarInspeccion()">Finalizar inspección</button>`:''}
+  `;
+}
+
+window.calificarCategoria = async function(id, nombre, calificacion){
+  const insp = inspeccionActual;
+  insp.categorias = insp.categorias || {};
+  insp.categorias[id] = {nombre, calificacion, observacion: insp.categorias[id]?.observacion||''};
+  try{
+    await updateDoc(doc(db,'inspecciones',insp.id), {categorias: insp.categorias});
+  } catch(e){ showToast('Error al guardar','err'); }
+  renderDetalleInspeccion();
+};
+
+window.guardarObsCategoria = async function(id, texto){
+  const insp = inspeccionActual;
+  if(!insp.categorias[id]) return;
+  insp.categorias[id].observacion = texto;
+  try{ await updateDoc(doc(db,'inspecciones',insp.id), {categorias: insp.categorias}); }catch(e){}
+};
+
+// Al finalizar: calcula duración, y cualquier categoría "Crítico" se
+// convierte automáticamente en una incidencia (con prioridad crítica),
+// para no tener que cargarla dos veces por separado.
+window.finalizarInspeccion = async function(){
+  const insp = inspeccionActual;
+  const duracionMin = Math.round((tsAhora()-insp.horaInicioTs)/60000);
+  showLoading();
+  try{
+    await updateDoc(doc(db,'inspecciones',insp.id), {estado:'finalizada', duracionMin});
+    insp.estado='finalizada'; insp.duracionMin=duracionMin;
+
+    const criticos = Object.entries(insp.categorias||{}).filter(([,c])=>c.calificacion==='critico');
+    for(const [id,c] of criticos){
+      const codigo = siguienteCodigoIncidencia();
+      const ref = doc(collection(db,'incidencias'));
+      const data = {
+        sucursal: currentSuc, area: c.nombre, prioridad:'critica',
+        titulo: `Detectado en inspección: ${c.nombre}`, descripcion: c.observacion||'Calificado como crítico en inspección',
+        responsable:'', costo:null, proveedor:'', fotoAntes:null, fotoDurante:null, fotoDespues:null,
+        codigo, estado:'abierta', comentarios:[], detectadoPor:currentUser.name,
+        fecha:fechaHoy(), creadoPor:currentUser.name, creadoEn:new Date().toISOString(),
+        origenInspeccionId: insp.id,
+      };
+      await setDoc(ref, data);
+      incidenciasData.unshift({id:ref.id, ...data});
+    }
+    showToast(criticos.length?`Inspección finalizada — se generaron ${criticos.length} incidencia(s) crítica(s)`:'Inspección finalizada');
+    inspeccionActual = insp;
+    renderDetalleInspeccion();
+  } catch(e){ showToast('Error al finalizar','err'); }
+  hideLoading();
+};
+
+// ------------------------------------------------------------
+// MANTENIMIENTO — historial por máquina/equipo, con alerta cuando
+// el próximo mantenimiento está por vencer o ya venció.
+// ------------------------------------------------------------
+function estadoMantenimiento(m){
+  if(!m.proximoMantenimiento) return 'vigente';
+  const hoy = fechaHoy();
+  const en7 = fechaLocal(new Date(Date.now()+7*86400000));
+  if(m.proximoMantenimiento < hoy) return 'vencido';
+  if(m.proximoMantenimiento <= en7) return 'por_vencer';
+  return 'vigente';
+}
+function estadoMantLabel(e){ return {vigente:'Vigente',por_vencer:'Por vencer',vencido:'Vencido'}[e]||e; }
+
+function cargarMantenimiento(){ renderMantenimiento(); }
+
+window.renderMantenimiento = function(){
+  const cont = document.getElementById('ops-mantenimiento-lista');
+  const filtro = document.getElementById('mant-filtro-estado').value;
+  let lista = mantenimientoData.map(m=>({...m, _estado:estadoMantenimiento(m)}));
+  if(filtro) lista = lista.filter(m=>m._estado===filtro);
+  if(!lista.length){ cont.innerHTML='<div class="empty">Sin registros de mantenimiento</div>'; return; }
+
+  cont.innerHTML = lista.map(m=>`
+    <div class="incidencia-card" style="cursor:default">
+      <div class="incidencia-top">
+        <div>
+          <div class="incidencia-titulo">${m.maquina}</div>
+          <div class="incidencia-meta">${m.tipo==='preventivo'?'Preventivo':'Correctivo'} · ${m.fecha} · ${m.proveedor||'sin proveedor'}</div>
+        </div>
+        <span class="estado-badge estado-${m._estado==='vencido'?'cancelada':m._estado==='por_vencer'?'en_proceso':'finalizada'}">${estadoMantLabel(m._estado)}</span>
+      </div>
+      ${m.observaciones?`<div class="incidencia-meta" style="margin-bottom:6px">${m.observaciones}</div>`:''}
+      <div class="incidencia-tags">
+        ${m.costo?`<span class="suc-tag-mini">Bs ${m.costo}</span>`:''}
+        ${m.proximoMantenimiento?`<span class="suc-tag-mini">Próximo: ${m.proximoMantenimiento}</span>`:''}
+        ${m.foto?`<span class="suc-tag-mini">📷 con foto</span>`:''}
+      </div>
+      ${m.foto?`<img src="${m.foto}" class="report-foto" onclick="window.open('${m.foto}')" style="margin-top:8px">`:''}
+    </div>`).join('');
+};
+
+window.abrirModalMantenimiento = function(){
+  document.getElementById('mant-maquina').value='';
+  document.getElementById('mant-tipo').value='preventivo';
+  document.getElementById('mant-fecha').value=fechaHoy();
+  document.getElementById('mant-proveedor').value='';
+  document.getElementById('mant-costo').value='';
+  document.getElementById('mant-proximo').value='';
+  document.getElementById('mant-obs').value='';
+  fotoMantActual=null;
+  document.getElementById('mant-foto-preview').style.display='none';
+  document.getElementById('modal-mantenimiento').classList.add('open');
+};
+
+window.previewFotoMant = async function(input){
+  if(!input.files || !input.files[0]) return;
+  try{
+    fotoMantActual = await comprimirImagen(input.files[0]);
+    const img = document.getElementById('mant-foto-preview');
+    img.src = fotoMantActual; img.style.display='block';
+  } catch(e){ showToast('No se pudo cargar la foto','err'); }
+};
+
+window.guardarMantenimiento = async function(){
+  const maquina = document.getElementById('mant-maquina').value.trim();
+  const tipo = document.getElementById('mant-tipo').value;
+  const fecha = document.getElementById('mant-fecha').value;
+  const proveedor = document.getElementById('mant-proveedor').value.trim();
+  const costoVal = document.getElementById('mant-costo').value;
+  const costo = costoVal!==''?Number(costoVal):null;
+  const proximoMantenimiento = document.getElementById('mant-proximo').value || null;
+  const observaciones = document.getElementById('mant-obs').value.trim();
+  if(!maquina || !fecha){ showToast('Completa la máquina y la fecha','err'); return; }
+  showLoading();
+  try{
+    const ref = doc(collection(db,'mantenimientos'));
+    const data = {
+      sucursal:currentSuc, maquina, tipo, fecha, proveedor, costo, proximoMantenimiento,
+      observaciones, foto:fotoMantActual, creadoPor:currentUser.name, creadoEn:new Date().toISOString(),
+    };
+    await setDoc(ref, data);
+    mantenimientoData.unshift({id:ref.id, ...data});
+    closeModal('modal-mantenimiento');
+    showToast('Mantenimiento registrado');
+    renderMantenimiento();
+  } catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
+};
+
+// ------------------------------------------------------------
+// GASTOS — se puede vincular a una incidencia o mantenimiento
+// existente para no perder la trazabilidad del costo.
+// ------------------------------------------------------------
+function cargarGastos(){ renderGastos(); }
+
+window.renderGastos = function(){
+  const cont = document.getElementById('ops-gastos-lista');
+  const filtro = document.getElementById('gasto-filtro-categoria').value;
+  let lista = gastosData;
+  if(filtro) lista = lista.filter(g=>g.categoria===filtro);
+  if(!lista.length){ cont.innerHTML='<div class="empty">Sin gastos registrados</div>'; return; }
+  const total = lista.reduce((acc,g)=>acc+(g.monto||0),0);
+
+  cont.innerHTML = `<div class="rev-resumen-sup">${lista.length} gasto(s) · Bs ${total.toFixed(2)} en total</div>` +
+    lista.map(g=>`
+    <div class="incidencia-card" style="cursor:default">
+      <div class="incidencia-top">
+        <div>
+          <div class="incidencia-titulo">${g.concepto} — Bs ${g.monto}</div>
+          <div class="incidencia-meta">${g.fecha} · ${g.proveedor||'sin proveedor'} · registró ${g.creadoPor}</div>
+        </div>
+        <span class="prioridad-tag prioridad-media">${g.categoria}</span>
+      </div>
+      ${g.observaciones?`<div class="incidencia-meta">${g.observaciones}</div>`:''}
+      ${g.foto?`<img src="${g.foto}" class="report-foto" onclick="window.open('${g.foto}')" style="margin-top:8px">`:''}
+    </div>`).join('');
+};
+
+window.abrirModalGasto = function(){
+  document.getElementById('gasto-concepto').value='';
+  document.getElementById('gasto-monto').value='';
+  document.getElementById('gasto-categoria').value='mantenimiento';
+  document.getElementById('gasto-proveedor').value='';
+  document.getElementById('gasto-obs').value='';
+  fotoGastoActual=null;
+  document.getElementById('gasto-foto-preview').style.display='none';
+  document.getElementById('modal-gasto').classList.add('open');
+};
+
+window.previewFotoGasto = async function(input){
+  if(!input.files || !input.files[0]) return;
+  try{
+    fotoGastoActual = await comprimirImagen(input.files[0]);
+    const img = document.getElementById('gasto-foto-preview');
+    img.src = fotoGastoActual; img.style.display='block';
+  } catch(e){ showToast('No se pudo cargar la foto','err'); }
+};
+
+window.guardarGasto = async function(){
+  const concepto = document.getElementById('gasto-concepto').value.trim();
+  const montoVal = document.getElementById('gasto-monto').value;
+  const monto = montoVal!==''?Number(montoVal):0;
+  const categoria = document.getElementById('gasto-categoria').value;
+  const proveedor = document.getElementById('gasto-proveedor').value.trim();
+  const observaciones = document.getElementById('gasto-obs').value.trim();
+  if(!concepto || !monto){ showToast('Completa el concepto y el monto','err'); return; }
+  showLoading();
+  try{
+    const ref = doc(collection(db,'gastos'));
+    const data = {
+      sucursal:currentSuc, concepto, monto, categoria, proveedor, observaciones,
+      foto:fotoGastoActual, fecha:fechaHoy(), creadoPor:currentUser.name, creadoEn:new Date().toISOString(),
+    };
+    await setDoc(ref, data);
+    gastosData.unshift({id:ref.id, ...data});
+    closeModal('modal-gasto');
+    showToast('Gasto registrado');
+    renderGastos();
+  } catch(e){ showToast('Error al guardar','err'); }
   hideLoading();
 };

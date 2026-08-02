@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260727f">
+<link rel="stylesheet" href="styles.css?v=20260728c">
 </head>
 <body>
 
@@ -177,8 +177,273 @@
         <div class="agenda-lista" id="agenda-lista"></div>
       </div>
     </div>
+
+    <div id="panel-ops" class="panel">
+      <div class="clases-toolbar">
+        <div class="clases-switch" id="switch-ops">
+          <button class="clases-switch-btn active" data-vista="dashboard" onclick="cambiarVistaOps('dashboard')">Dashboard</button>
+          <button class="clases-switch-btn" data-vista="incidencias" onclick="cambiarVistaOps('incidencias')">Incidencias</button>
+          <button class="clases-switch-btn" data-vista="bitacora" onclick="cambiarVistaOps('bitacora')">Bitácora</button>
+          <button class="clases-switch-btn" data-vista="checklist" onclick="cambiarVistaOps('checklist')">Checklist</button>
+          <button class="clases-switch-btn" data-vista="inspecciones" onclick="cambiarVistaOps('inspecciones')">Inspecciones</button>
+          <button class="clases-switch-btn" data-vista="mantenimiento" onclick="cambiarVistaOps('mantenimiento')">Mantenimiento</button>
+          <button class="clases-switch-btn" data-vista="gastos" onclick="cambiarVistaOps('gastos')">Gastos</button>
+        </div>
+        <button class="btn-asignar" id="btn-nueva-incidencia" style="display:none" onclick="abrirModalIncidencia()">+ Nueva incidencia</button>
+        <button class="btn-asignar" id="btn-nueva-bitacora" style="display:none" onclick="abrirModalBitacora()">+ Nueva entrada</button>
+        <button class="btn-asignar" id="btn-editar-checklist-ops" style="display:none" onclick="abrirModalEditarChecklistOps()">Editar lista</button>
+        <button class="btn-asignar" id="btn-nueva-inspeccion" style="display:none" onclick="crearInspeccion()">+ Nueva inspección</button>
+        <button class="btn-asignar" id="btn-nuevo-mantenimiento" style="display:none" onclick="abrirModalMantenimiento()">+ Nuevo mantenimiento</button>
+        <button class="btn-asignar" id="btn-nuevo-gasto" style="display:none" onclick="abrirModalGasto()">+ Nuevo gasto</button>
+      </div>
+
+      <div id="ops-dashboard-container"></div>
+
+      <div id="ops-incidencias-container" style="display:none">
+        <div class="pt-filtros">
+          <select id="inc-filtro-estado" onchange="renderIncidencias()">
+            <option value="">Todos los estados</option>
+            <option value="abierta">Abierta</option>
+            <option value="en_proceso">En proceso</option>
+            <option value="resuelta">Resuelta</option>
+            <option value="cancelada">Cancelada</option>
+          </select>
+          <select id="inc-filtro-prioridad" onchange="renderIncidencias()">
+            <option value="">Toda prioridad</option>
+            <option value="critica">Crítica</option>
+            <option value="alta">Alta</option>
+            <option value="media">Media</option>
+            <option value="baja">Baja</option>
+          </select>
+        </div>
+        <div id="ops-incidencias-lista"></div>
+      </div>
+
+      <div id="ops-bitacora-container" style="display:none"></div>
+
+      <div id="ops-checklist-container" style="display:none">
+        <div class="clases-switch" id="switch-checklist-ops" style="margin-bottom:16px">
+          <button class="clases-switch-btn active" data-tipo="apertura" onclick="cambiarTipoChecklistOps('apertura')">Apertura</button>
+          <button class="clases-switch-btn" data-tipo="cierre" onclick="cambiarTipoChecklistOps('cierre')">Cierre</button>
+        </div>
+        <div id="ops-checklist-lista"></div>
+      </div>
+
+      <div id="ops-inspecciones-container" style="display:none"></div>
+
+      <div id="ops-mantenimiento-container" style="display:none">
+        <div class="pt-filtros">
+          <select id="mant-filtro-estado" onchange="renderMantenimiento()">
+            <option value="">Todos</option>
+            <option value="vigente">Vigente</option>
+            <option value="por_vencer">Por vencer (7 días)</option>
+            <option value="vencido">Vencido</option>
+          </select>
+        </div>
+        <div id="ops-mantenimiento-lista"></div>
+      </div>
+
+      <div id="ops-gastos-container" style="display:none">
+        <div class="pt-filtros">
+          <select id="gasto-filtro-categoria" onchange="renderGastos()">
+            <option value="">Todas las categorías</option>
+            <option value="mantenimiento">Mantenimiento</option>
+            <option value="insumos">Insumos</option>
+            <option value="equipamiento">Equipamiento</option>
+            <option value="infraestructura">Infraestructura</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div id="ops-gastos-lista"></div>
+      </div>
+    </div>
   </div>
 </div>
+
+<!-- MODAL NUEVO MANTENIMIENTO -->
+<div class="modal-overlay" id="modal-mantenimiento">
+  <div class="modal">
+    <div class="modal-title">Nuevo mantenimiento</div>
+    <div class="field"><label>Máquina / equipo</label><input type="text" id="mant-maquina" placeholder="Ej: Trotadora 3, Aire acondicionado recepción"></div>
+    <div class="field-row">
+      <div class="field"><label>Tipo</label>
+        <select id="mant-tipo"><option value="preventivo">Preventivo</option><option value="correctivo">Correctivo</option></select>
+      </div>
+      <div class="field"><label>Fecha</label><input type="date" id="mant-fecha"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Proveedor</label><input type="text" id="mant-proveedor" placeholder="Nombre del proveedor"></div>
+      <div class="field"><label>Costo (opcional)</label><input type="number" id="mant-costo" placeholder="0"></div>
+    </div>
+    <div class="field"><label>Próximo mantenimiento (opcional)</label><input type="date" id="mant-proximo"></div>
+    <div class="field"><label>Observaciones</label><textarea id="mant-obs" placeholder="Detalle del trabajo realizado..."></textarea></div>
+    <div class="field">
+      <label>Foto (opcional)</label>
+      <div class="foto-btns">
+        <button type="button" class="btn-foto" onclick="document.getElementById('mant-foto-cam').click()">📷 Tomar foto</button>
+        <button type="button" class="btn-foto" onclick="document.getElementById('mant-foto-gal').click()">🖼 Galería</button>
+      </div>
+      <input type="file" id="mant-foto-cam" accept="image/*" capture="environment" style="display:none" onchange="previewFotoMant(this)">
+      <input type="file" id="mant-foto-gal" accept="image/*" style="display:none" onchange="previewFotoMant(this)">
+      <img id="mant-foto-preview" class="report-foto" style="display:none;max-height:120px">
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-mantenimiento')">Cancelar</button>
+      <button class="btn-send" onclick="guardarMantenimiento()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVO GASTO -->
+<div class="modal-overlay" id="modal-gasto">
+  <div class="modal">
+    <div class="modal-title">Nuevo gasto</div>
+    <div class="field"><label>Concepto</label><input type="text" id="gasto-concepto" placeholder="Ej: Compra de trapeadores"></div>
+    <div class="field-row">
+      <div class="field"><label>Monto</label><input type="number" id="gasto-monto" placeholder="0"></div>
+      <div class="field"><label>Categoría</label>
+        <select id="gasto-categoria">
+          <option value="mantenimiento">Mantenimiento</option>
+          <option value="insumos">Insumos</option>
+          <option value="equipamiento">Equipamiento</option>
+          <option value="infraestructura">Infraestructura</option>
+          <option value="otro">Otro</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Proveedor (opcional)</label><input type="text" id="gasto-proveedor" placeholder="Nombre del proveedor"></div>
+    <div class="field"><label>Observaciones (opcional)</label><textarea id="gasto-obs" placeholder="Detalle adicional..."></textarea></div>
+    <div class="field">
+      <label>Foto de factura (opcional)</label>
+      <div class="foto-btns">
+        <button type="button" class="btn-foto" onclick="document.getElementById('gasto-foto-cam').click()">📷 Tomar foto</button>
+        <button type="button" class="btn-foto" onclick="document.getElementById('gasto-foto-gal').click()">🖼 Galería</button>
+      </div>
+      <input type="file" id="gasto-foto-cam" accept="image/*" capture="environment" style="display:none" onchange="previewFotoGasto(this)">
+      <input type="file" id="gasto-foto-gal" accept="image/*" style="display:none" onchange="previewFotoGasto(this)">
+      <img id="gasto-foto-preview" class="report-foto" style="display:none;max-height:120px">
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-gasto')">Cancelar</button>
+      <button class="btn-send" onclick="guardarGasto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVA/EDITAR INCIDENCIA -->
+<div class="modal-overlay" id="modal-incidencia">
+  <div class="modal modal-wide">
+    <div class="modal-title" id="modal-incidencia-titulo">Nueva incidencia</div>
+    <input type="hidden" id="incidencia-id-edit">
+    <div class="field-row">
+      <div class="field"><label>Área</label>
+        <select id="incidencia-area">
+          <option>Recepción</option><option>Musculación</option><option>Cardio</option><option>Peso libre</option>
+          <option>Baños</option><option>Duchas</option><option>Vestidores</option><option>Casilleros</option>
+          <option>Pisos</option><option>Techos</option><option>Paredes</option><option>Pintura</option>
+          <option>Electricidad</option><option>Iluminación</option><option>Neones</option><option>Letreros</option>
+          <option>Internet</option><option>Televisores</option><option>Sonido</option><option>Cámaras</option>
+          <option>Seguridad</option><option>Limpieza</option><option>Almacén</option><option>Oficina</option>
+          <option>Exterior</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="field"><label>Prioridad</label>
+        <select id="incidencia-prioridad">
+          <option value="baja">Baja</option><option value="media" selected>Media</option>
+          <option value="alta">Alta</option><option value="critica">Crítica</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Título</label><input type="text" id="incidencia-titulo" placeholder="Ej: Espejo roto en sala de pesas"></div>
+    <div class="field"><label>Descripción</label><textarea id="incidencia-desc" placeholder="Detalle del problema..."></textarea></div>
+    <div class="field" id="campo-incidencia-estado" style="display:none"><label>Estado</label>
+      <select id="incidencia-estado">
+        <option value="abierta">Abierta</option><option value="en_proceso">En proceso</option>
+        <option value="resuelta">Resuelta</option><option value="cancelada">Cancelada</option>
+      </select>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Responsable</label><input type="text" id="incidencia-responsable" placeholder="Quién la resuelve"></div>
+      <div class="field"><label>Costo estimado (opcional)</label><input type="number" id="incidencia-costo" placeholder="0"></div>
+    </div>
+    <div class="field"><label>Proveedor (opcional)</label><input type="text" id="incidencia-proveedor" placeholder="Nombre del proveedor"></div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Foto — antes</label>
+        <div class="foto-btns">
+          <button type="button" class="btn-foto" onclick="document.getElementById('inc-foto-antes-cam').click()">📷</button>
+          <button type="button" class="btn-foto" onclick="document.getElementById('inc-foto-antes-gal').click()">🖼</button>
+        </div>
+        <input type="file" id="inc-foto-antes-cam" accept="image/*" capture="environment" style="display:none" onchange="previewFotoIncidencia(this,'antes')">
+        <input type="file" id="inc-foto-antes-gal" accept="image/*" style="display:none" onchange="previewFotoIncidencia(this,'antes')">
+        <img id="inc-foto-antes-preview" class="report-foto" style="display:none;max-height:100px">
+      </div>
+      <div class="field">
+        <label>Foto — durante</label>
+        <div class="foto-btns">
+          <button type="button" class="btn-foto" onclick="document.getElementById('inc-foto-durante-cam').click()">📷</button>
+          <button type="button" class="btn-foto" onclick="document.getElementById('inc-foto-durante-gal').click()">🖼</button>
+        </div>
+        <input type="file" id="inc-foto-durante-cam" accept="image/*" capture="environment" style="display:none" onchange="previewFotoIncidencia(this,'durante')">
+        <input type="file" id="inc-foto-durante-gal" accept="image/*" style="display:none" onchange="previewFotoIncidencia(this,'durante')">
+        <img id="inc-foto-durante-preview" class="report-foto" style="display:none;max-height:100px">
+      </div>
+      <div class="field">
+        <label>Foto — después</label>
+        <div class="foto-btns">
+          <button type="button" class="btn-foto" onclick="document.getElementById('inc-foto-despues-cam').click()">📷</button>
+          <button type="button" class="btn-foto" onclick="document.getElementById('inc-foto-despues-gal').click()">🖼</button>
+        </div>
+        <input type="file" id="inc-foto-despues-cam" accept="image/*" capture="environment" style="display:none" onchange="previewFotoIncidencia(this,'despues')">
+        <input type="file" id="inc-foto-despues-gal" accept="image/*" style="display:none" onchange="previewFotoIncidencia(this,'despues')">
+        <img id="inc-foto-despues-preview" class="report-foto" style="display:none;max-height:100px">
+      </div>
+    </div>
+
+    <div id="incidencia-comentarios-bloque" style="display:none">
+      <div class="rep-section-title">Comentarios</div>
+      <div id="incidencia-comentarios-lista"></div>
+      <div class="field-row" style="margin-top:8px">
+        <input type="text" id="incidencia-nuevo-comentario" placeholder="Agregar comentario...">
+        <button type="button" class="btn-mini btn-mini-ok" onclick="agregarComentarioIncidencia()">Agregar</button>
+      </div>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-incidencia')">Cancelar</button>
+      <button class="btn-send" onclick="guardarIncidencia()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVA ENTRADA DE BITÁCORA -->
+<div class="modal-overlay" id="modal-bitacora">
+  <div class="modal">
+    <div class="modal-title">Nueva entrada de bitácora</div>
+    <div class="field"><label>Sucursal</label><select id="bitacora-sucursal"></select></div>
+    <div class="field"><label>Qué pasó / qué hiciste</label><textarea id="bitacora-texto" placeholder="Ej: Se encontró humedad en duchas, se solicitó cotización..."></textarea></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-bitacora')">Cancelar</button>
+      <button class="btn-send" onclick="guardarBitacora()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR LISTA DE CHECKLIST OPERATIVO -->
+<div class="modal-overlay" id="modal-editar-checklist-ops">
+  <div class="modal">
+    <div class="modal-title">Editar lista</div>
+    <div class="modal-sub">Un ítem por línea</div>
+    <input type="hidden" id="checklist-ops-edit-tipo">
+    <div class="field"><textarea id="checklist-ops-edit-textarea" style="min-height:200px"></textarea></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('modal-editar-checklist-ops')">Cancelar</button>
+      <button class="btn-send" onclick="guardarChecklistOpsConfig()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- MODAL NUEVO/EDITAR EVENTO DE AGENDA -->
 <div class="modal-overlay" id="modal-evento">
@@ -516,7 +781,7 @@
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20260727f"></script>
+<script type="module" src="app.js?v=20260728c"></script>
 <!-- VISOR DE FOTO A PANTALLA COMPLETA (con zoom y forma clara de salir) -->
 <div class="modal-overlay" id="modal-foto-viewer" onclick="if(event.target===this) cerrarFotoGrande()">
   <div class="foto-viewer-content">

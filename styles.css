@@ -192,13 +192,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .tabs{
   display:flex;gap:4px;background:var(--surface);
   border:1px solid var(--border2);border-radius:10px;
-  padding:4px;margin-bottom:20px;flex-wrap:wrap;
+  padding:4px;margin-bottom:20px;
+  overflow-x:auto;flex-wrap:nowrap;scrollbar-width:thin;
+  -webkit-overflow-scrolling:touch;
 }
+.tabs::-webkit-scrollbar{height:5px}
+.tabs::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 .tab{
-  flex:1;min-width:80px;padding:9px 6px;text-align:center;
+  flex:0 0 auto;white-space:nowrap;padding:9px 14px;text-align:center;
   font-size:12px;font-weight:500;color:var(--gray);
   cursor:pointer;border-radius:7px;transition:all .2s;letter-spacing:.5px;
 }
+.tab-divider{flex:0 0 auto;width:1px;background:var(--border2);margin:4px 4px}
 .tab:hover{color:var(--text);background:var(--surface2)}
 .tab.active{background:linear-gradient(180deg,var(--neon2),var(--neon));color:#fff;font-weight:700;box-shadow:var(--btn-shadow)}
 .panel{display:none}
@@ -783,3 +788,52 @@ textarea:focus{border-color:var(--neon)}
 .evento-titulo{font-size:13.5px;font-weight:600;color:var(--text)}
 .evento-meta{font-size:11px;color:var(--gray);margin-top:2px}
 .evento-desc{font-size:12px;color:var(--text2);margin-bottom:8px}
+
+/* ===================== OPERACIONES: INCIDENCIAS ===================== */
+.estado-badge.estado-abierta{background:rgba(255,51,51,.12);color:var(--danger)}
+.estado-badge.estado-en_proceso{background:rgba(255,136,0,.15);color:var(--warn)}
+.estado-badge.estado-resuelta{background:rgba(249,115,22,.15);color:var(--neon)}
+
+.incidencia-card{
+  background:var(--surface);background-image:var(--card-texture);border:1px solid var(--border2);
+  border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;cursor:pointer;
+  box-shadow:var(--card-shadow);transition:border .2s;
+}
+.incidencia-card:hover{border-color:var(--neon)}
+.incidencia-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+.incidencia-titulo{font-size:13.5px;font-weight:600;color:var(--text)}
+.incidencia-meta{font-size:11px;color:var(--gray);margin-top:2px}
+.incidencia-tags{display:flex;flex-wrap:wrap;gap:6px}
+.prioridad-tag{font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 9px;border-radius:10px;text-transform:uppercase}
+.prioridad-tag.prioridad-baja{background:rgba(120,170,255,.15);color:#78aaff}
+.prioridad-tag.prioridad-media{background:rgba(255,136,0,.15);color:var(--warn)}
+.prioridad-tag.prioridad-alta{background:rgba(255,51,51,.12);color:var(--danger)}
+.prioridad-tag.prioridad-critica{background:var(--danger);color:#fff}
+
+/* ===================== OPERACIONES: BITÁCORA ===================== */
+.bitacora-row{
+  display:flex;gap:12px;align-items:baseline;padding:8px 0;border-top:1px solid var(--border);font-size:12.5px;
+}
+.bitacora-row:first-child{border-top:none}
+.bitacora-fecha{color:var(--neon);font-weight:700;font-size:11px;min-width:48px;flex-shrink:0}
+.bitacora-texto{flex:1;color:var(--text)}
+.bitacora-autor{color:var(--gray);font-size:11px;flex-shrink:0}
+
+/* ===================== OPERACIONES: COMENTARIOS DE INCIDENCIA ===================== */
+.comentario-row{
+  font-size:12px;color:var(--text2);padding:8px 0;border-top:1px solid var(--border);
+}
+.comentario-row:first-child{border-top:none}
+.comentario-row strong{color:var(--text);font-size:11.5px}
+
+/* ===================== OPERACIONES: INSPECCIONES ===================== */
+.btn-cal-excelente{background:rgba(249,115,22,.1);color:var(--neon);border:1px solid rgba(249,115,22,.25)}
+.btn-cal-bueno{background:rgba(120,170,255,.1);color:#78aaff;border:1px solid rgba(120,170,255,.25)}
+.btn-cal-regular{background:rgba(255,136,0,.1);color:var(--warn);border:1px solid rgba(255,136,0,.25)}
+.btn-cal-malo{background:rgba(255,90,50,.1);color:#ff5a32;border:1px solid rgba(255,90,50,.25)}
+.btn-cal-critico{background:rgba(255,51,51,.1);color:var(--danger);border:1px solid rgba(255,51,51,.25)}
+.btn-cal-excelente.activo{background:var(--neon);color:#fff}
+.btn-cal-bueno.activo{background:#78aaff;color:#fff}
+.btn-cal-regular.activo{background:var(--warn);color:#fff}
+.btn-cal-malo.activo{background:#ff5a32;color:#fff}
+.btn-cal-critico.activo{background:var(--danger);color:#fff}
