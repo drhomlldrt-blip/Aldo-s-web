@@ -85,9 +85,17 @@ window.selectSuc = function(suc){
   currentSuc = suc;
   // Supervisor: cambiar sucursal sin re-login
   if(currentUser && currentUser.role === 'supervisor'){
+    document.getElementById('dash-suc').textContent = currentSuc;
     guardarSesion();
     showLoading();
-    loadDash().then(()=>{
+    Promise.all([renderChecklist(), cargarReportes()]).then(()=>{
+      if(currentUser.role==='supervisor') cargarAlertas();
+      const panelActivo = document.querySelector('.panel.active');
+      if(panelActivo){
+        if(panelActivo.id==='panel-historial')  cargarHistorial();
+        if(panelActivo.id==='panel-aerobicos')  initClasesPanel('aerobicos');
+        if(panelActivo.id==='panel-spinning')   initClasesPanel('spinning');
+      }
       hideLoading();
       show('screen-dash');
       showToast('Sucursal cambiada: ' + suc);
@@ -144,57 +152,6 @@ document.getElementById('inp-pass').addEventListener('keydown',e=>{ if(e.key==='
 // ============================================================
 // DASHBOARD
 // ============================================================
-// ============================================================
-// NAVEGACIÓN EN 2 NIVELES (supervisor): categoría → sub-pestañas.
-// Recepción y limpieza siguen con la barra simple de siempre,
-// ya que tienen pocas pestañas y no lo necesitan.
-// ============================================================
-window.seleccionarCategoria = function(catId, silencioso){
-  const categorias = window._categoriasDash || [];
-  const cat = categorias.find(c=>c.id===catId);
-  if(!cat) return;
-  document.querySelectorAll('.categoria-btn').forEach(b=>b.classList.toggle('active', b.dataset.cat===catId));
-  renderTabsEnBarra(cat.tabs, true);
-};
-
-function renderTabsEnBarra(tabs, activarPrimera){
-  const tabsEl = document.getElementById('tabs-container');
-  tabsEl.innerHTML='';
-  tabs.forEach((t,i)=>{
-    const el=document.createElement('div');
-    el.className='tab'+(activarPrimera && i===0?' active':'');
-    el.dataset.panel=t.id;
-    if(t.id==='panel-reportes' && currentUser.role==='limpieza'){
-      el.innerHTML = `${t.label} <span class="tab-badge" id="tab-badge-reportes" style="display:none">0</span>`;
-    } else {
-      el.textContent=t.label;
-    }
-    el.onclick=()=>activarPanelTab(t.id);
-    tabsEl.appendChild(el);
-  });
-  if(activarPrimera && tabs.length) activarPanelTab(tabs[0].id, true);
-}
-
-// Centraliza qué hay que cargar/refrescar según la pestaña elegida,
-// para no repetir esta lista en cada lugar que activa una pestaña.
-function activarPanelTab(panelId, siloso){
-  const allPanels = window._allPanelsDash || [];
-  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x.dataset.panel===panelId));
-  allPanels.forEach(p=>document.getElementById(p).classList.remove('active'));
-  const panelEl = document.getElementById(panelId);
-  if(panelEl) panelEl.classList.add('active');
-  guardarPanelActivo(panelId);
-  if(panelId==='panel-historial')  cargarHistorial();
-  if(panelId==='panel-revision')   renderRevision();
-  if(panelId==='panel-alertas')    cargarAlertas();
-  if(panelId==='panel-pt')         initPTPanel();
-  if(panelId==='panel-agenda')     initAgendaPanel();
-  if(panelId==='panel-ops')        initOpsPanel();
-  if(panelId==='panel-admin')      cargarUsuarios();
-  if(panelId==='panel-aerobicos')  initClasesPanel('aerobicos');
-  if(panelId==='panel-spinning')   initClasesPanel('spinning');
-}
-
 async function loadDash(){
   document.getElementById('dash-suc').textContent  = currentSuc;
   document.getElementById('dash-user').textContent = currentUser.name;
@@ -209,30 +166,19 @@ async function loadDash(){
   if(btnSup) btnSup.style.display = currentUser.role==='supervisor' ? 'block' : 'none';
 
   let tabs = [];
-  let categorias = null;
-
   if(currentUser.role==='supervisor'){
-    categorias = [
-      {id:'limpieza', label:'🧹 Control de Limpieza', tabs:[
-        {id:'panel-checklist', label:'Checklist'},
-        {id:'panel-reportes',  label:'Reportes'},
-        {id:'panel-revision',  label:'Revisión áreas'},
-        {id:'panel-historial', label:'Historial'},
-      ]},
-      {id:'clases', label:'🏋 Aeróbicos y Spinning', tabs:[
-        {id:'panel-aerobicos', label:'Aeróbicos'},
-        {id:'panel-spinning',  label:'Spinning'},
-      ]},
-      {id:'pt', label:'👤 Entrenadores PT', tabs:[
-        {id:'panel-pt', label:'Entrenadores PT'},
-      ]},
-      {id:'admin', label:'⚙ Administración', tabs:[
-        {id:'panel-agenda',  label:'Agenda'},
-        {id:'panel-ops',     label:'Operaciones'},
-        {id:'panel-expediente', label:'Expediente'},
-        {id:'panel-alertas', label:'Alertas'},
-        {id:'panel-admin',   label:'Usuarios'},
-      ]},
+    tabs=[
+      {id:'panel-checklist', label:'Checklist',       grupo:'op'},
+      {id:'panel-reportes',  label:'Reportes',        grupo:'op'},
+      {id:'panel-revision',  label:'Revisión áreas',  grupo:'op'},
+      {id:'panel-historial', label:'Historial',       grupo:'op'},
+      {id:'panel-aerobicos', label:'Aeróbicos',       grupo:'clases'},
+      {id:'panel-spinning',  label:'Spinning',        grupo:'clases'},
+      {id:'panel-pt',        label:'Entrenadores PT', grupo:'gestion'},
+      {id:'panel-agenda',    label:'Agenda',          grupo:'gestion'},
+      {id:'panel-ops',       label:'Operaciones',     grupo:'gestion'},
+      {id:'panel-alertas',   label:'Alertas',         grupo:'sistema'},
+      {id:'panel-admin',     label:'Usuarios',        grupo:'sistema'},
     ];
   } else if(currentUser.role==='recepcionista'){
     tabs=[
@@ -249,24 +195,47 @@ async function loadDash(){
     ];
   }
 
-  const allPanels=['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin','panel-aerobicos','panel-spinning','panel-pt','panel-agenda','panel-ops','panel-expediente'];
+  const allPanels=['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin','panel-aerobicos','panel-spinning','panel-pt','panel-agenda','panel-ops'];
   allPanels.forEach(p=>document.getElementById(p).classList.remove('active'));
-  window._allPanelsDash = allPanels;
 
-  const catCont = document.getElementById('categorias-container');
+  const tabsEl=document.getElementById('tabs-container');
+  tabsEl.innerHTML='';
+  let grupoAnterior=null;
+  tabs.forEach((t,i)=>{
+    if(t.grupo && grupoAnterior && t.grupo!==grupoAnterior){
+      const div=document.createElement('div');
+      div.className='tab-divider';
+      tabsEl.appendChild(div);
+    }
+    grupoAnterior = t.grupo || grupoAnterior;
+    const el=document.createElement('div');
+    el.className='tab'+(i===0?' active':'');
+    el.dataset.panel=t.id;
+    if(t.id==='panel-reportes' && currentUser.role==='limpieza'){
+      el.innerHTML = `${t.label} <span class="tab-badge" id="tab-badge-reportes" style="display:none">0</span>`;
+    } else {
+      el.textContent=t.label;
+    }
+    el.onclick=()=>{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      el.classList.add('active');
+      allPanels.forEach(p=>document.getElementById(p).classList.remove('active'));
+      document.getElementById(t.id).classList.add('active');
+      guardarPanelActivo(t.id);
+      if(t.id==='panel-historial')  cargarHistorial();
+      if(t.id==='panel-revision')   renderRevision();
+      if(t.id==='panel-alertas')    cargarAlertas();
+      if(t.id==='panel-pt')        initPTPanel();
+      if(t.id==='panel-agenda')    initAgendaPanel();
+      if(t.id==='panel-ops')       initOpsPanel();
+      if(t.id==='panel-admin')      cargarUsuarios();
+      if(t.id==='panel-aerobicos')  initClasesPanel('aerobicos');
+      if(t.id==='panel-spinning')   initClasesPanel('spinning');
+    };
+    tabsEl.appendChild(el);
+  });
 
-  if(categorias){
-    window._categoriasDash = categorias;
-    catCont.style.display='flex';
-    catCont.innerHTML = categorias.map((c,i)=>
-      `<div class="categoria-btn${i===0?' active':''}" id="cat-btn-${c.id}" data-cat="${c.id}" onclick="seleccionarCategoria('${c.id}')">${c.label}${c.id==='admin'?' <span class="cat-badge" id="cat-badge-admin" style="display:none"></span>':''}</div>`
-    ).join('');
-    seleccionarCategoria(categorias[0].id, true);
-  } else {
-    catCont.style.display='none';
-    catCont.innerHTML='';
-    renderTabsEnBarra(tabs, true);
-  }
+  if(tabs.length) document.getElementById(tabs[0].id).classList.add('active');
 
   turnoVista = currentUser.turno || detectarTurno();
 
@@ -984,11 +953,6 @@ async function cargarAlertas(){
     tabAlertas.style.background=alertas.length>0?'#e84a4a':'';
     tabAlertas.style.color=alertas.length>0?'#fff':'';
   }
-  const catBadge=document.getElementById('cat-badge-admin');
-  if(catBadge){
-    if(alertas.length>0){ catBadge.textContent=alertas.length; catBadge.style.display='inline-flex'; }
-    else catBadge.style.display='none';
-  }
   if(!alertas.length){ cont.innerHTML='<div class="empty">Sin alertas ✓</div>'; return; }
   cont.innerHTML=`
     <div class="alerta-banner">⚠ ${alertas.length} tarea${alertas.length>1?'s':''} sin atender en más de 24 horas</div>
@@ -1672,11 +1636,6 @@ function guardarPanelActivo(panelId){
     await loadDash();
     const panelGuardado = localStorage.getItem(SESSION_PANEL_KEY);
     if(panelGuardado){
-      const categorias = window._categoriasDash;
-      if(categorias){
-        const catDueña = categorias.find(c=>c.tabs.some(t=>t.id===panelGuardado));
-        if(catDueña) seleccionarCategoria(catDueña.id, true);
-      }
       const tabEl = [...document.querySelectorAll('.tab')].find(t=>t.dataset.panel===panelGuardado);
       if(tabEl) tabEl.click();
     }
@@ -1718,7 +1677,7 @@ setInterval(async ()=>{
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260729a';
+const APP_VERSION = '20260728c';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
@@ -1813,19 +1772,14 @@ function renderSesionesPT(){
   cont.innerHTML = lista.map(s=>`
     <div class="sesion-card ${s.estado==='en_curso'?'en-curso':''} ${s.estado==='anulada'?'anulada':''}">
       <div class="sesion-top">
-        <div style="display:flex;align-items:center;gap:10px">
-          ${s.entrenadorFoto?`<img src="${s.entrenadorFoto}" class="entrenador-avatar">`:`<div class="entrenador-avatar entrenador-avatar-vacio">${(s.entrenadorNombre||'?')[0].toUpperCase()}</div>`}
-          <div>
-            <div class="sesion-cliente">${s.cliente}</div>
-            <div class="sesion-entrenador">${s.entrenadorNombre} ${s.entrenadorCodigo?'· '+s.entrenadorCodigo:''}</div>
-          </div>
+        <div>
+          <div class="sesion-cliente">${s.cliente}</div>
+          <div class="sesion-entrenador">${s.entrenadorNombre} ${s.entrenadorCodigo?'· '+s.entrenadorCodigo:''}</div>
         </div>
         <span class="estado-badge estado-${s.estado}">${estadoSesionLabel(s.estado)}</span>
       </div>
-      <div class="sesion-hora">
-        🕐 ${s.horaInicio}${s.horaFin?' – '+s.horaFin:''} ${!s.horaFin?'<span class="sesion-hora-curso">en curso</span>':''}
-      </div>
       <div class="sesion-meta">
+        ${s.horaInicio}${s.horaFin?' – '+s.horaFin:' – en curso'} ·
         Cliente ${estadoClienteLabel(s.estadoCliente)} · Registró: ${s.recepcionista}
       </div>
       ${s.observaciones?`<div class="sesion-obs">${s.observaciones}</div>`:''}
@@ -1848,7 +1802,6 @@ window.abrirModalSesionPT = function(){
   document.getElementById('sesion-cliente').value='';
   document.getElementById('sesion-estado-cliente').value='nuevo';
   document.getElementById('sesion-obs').value='';
-  document.getElementById('sesion-hora-actual').textContent = horaActual();
   document.getElementById('modal-sesion-pt').classList.add('open');
 };
 
@@ -1864,7 +1817,6 @@ window.guardarSesionPT = async function(){
   try{
     await setDoc(doc(collection(db,'sesiones_pt')),{
       sucursal:currentSuc, entrenadorId, entrenadorCodigo:entrenador?entrenador.codigo:'', entrenadorNombre:entrenador?entrenador.nombre:'',
-      entrenadorFoto: entrenador?(entrenador.foto||null):null,
       cliente, estadoCliente, fecha:fechaHoy(), horaInicio:horaActual(), horaFin:null,
       estado:'en_curso', observaciones:obs, recepcionista:currentUser.name,
       creadoEn:new Date().toISOString(),
@@ -1877,7 +1829,7 @@ window.guardarSesionPT = async function(){
 };
 
 window.finalizarSesionPT = async function(id){
-  if(!confirm(`¿Marcar esta sesión como finalizada? Se registrará como hora de salida: ${horaActual()}`)) return;
+  if(!confirm('¿Marcar esta sesión como finalizada?')) return;
   showLoading();
   try{
     await updateDoc(doc(db,'sesiones_pt',id),{ horaFin:horaActual(), estado:'finalizada', finalizadoPor:currentUser.name });
@@ -1925,12 +1877,9 @@ function renderEntrenadoresPT(){
     return `
     <div class="entrenador-card" ${esSup?`onclick="abrirModalEntrenador('${e.id}')"`:''}>
       <div class="entrenador-top">
-        <div style="display:flex;align-items:center;gap:12px">
-          ${e.foto?`<img src="${e.foto}" class="entrenador-avatar">`:`<div class="entrenador-avatar entrenador-avatar-vacio">${(e.nombre||'?')[0].toUpperCase()}</div>`}
-          <div>
-            <div class="entrenador-nombre">${e.nombre}</div>
-            <div class="entrenador-codigo">${e.codigo}</div>
-          </div>
+        <div>
+          <div class="entrenador-nombre">${e.nombre}</div>
+          <div class="entrenador-codigo">${e.codigo}</div>
         </div>
         <span class="estado-badge estado-${e.estado}">${estadoEntrenadorLabel(e.estado)}${vencido?' · vencido':''}</span>
       </div>
@@ -1966,29 +1915,10 @@ function renderChecksSucursalesPT(seleccionadas){
     </label>`).join('');
 }
 
-let fotoEntrenadorActual = null;
-
-window.previewFotoEntrenador = async function(input){
-  if(!input.files || !input.files[0]) return;
-  try{
-    fotoEntrenadorActual = await comprimirImagen(input.files[0]);
-    const img = document.getElementById('entrenador-foto-preview');
-    img.src = fotoEntrenadorActual; img.style.display='block';
-    document.getElementById('entrenador-foto-placeholder').style.display='none';
-  } catch(e){ showToast('No se pudo cargar la foto','err'); }
-};
-
 window.abrirModalEntrenador = function(id){
   const e = id ? entrenadoresData.find(x=>x.id===id) : null;
   document.getElementById('entrenador-id-edit').value = id||'';
   document.getElementById('modal-entrenador-titulo').textContent = e?'Editar entrenador':'Nuevo entrenador';
-  fotoEntrenadorActual = e?(e.foto||null):null;
-  const preview = document.getElementById('entrenador-foto-preview');
-  const placeholder = document.getElementById('entrenador-foto-placeholder');
-  if(fotoEntrenadorActual){ preview.src=fotoEntrenadorActual; preview.style.display='block'; placeholder.style.display='none'; }
-  else { preview.style.display='none'; placeholder.style.display='flex'; }
-  document.getElementById('entrenador-foto-cam').value='';
-  document.getElementById('entrenador-foto-gal').value='';
   const codigoInput = document.getElementById('entrenador-codigo');
   codigoInput.value = e?e.codigo:siguienteCodigoEntrenador();
   codigoInput.readOnly = !!e; // el código no se cambia una vez creado, por trazabilidad
@@ -2025,7 +1955,7 @@ window.guardarEntrenador = async function(){
       if(nuevaIncidencia) incidencias.push({fecha:fechaHoy(), descripcion:nuevaIncidencia, registradoPor:currentUser.name});
       await updateDoc(doc(db,'entrenadores',id),{
         nombre, estado, vigenciaHasta, fechaAutorizacion, autorizadoPor, observaciones,
-        sucursalesHabilitadas, incidencias, foto: fotoEntrenadorActual,
+        sucursalesHabilitadas, incidencias,
         actualizadoPor:currentUser.name, actualizadoEn:new Date().toISOString(),
       });
       let cambio = 'Editó datos del entrenador';
@@ -2035,7 +1965,7 @@ window.guardarEntrenador = async function(){
       const ref = doc(collection(db,'entrenadores'));
       await setDoc(ref,{
         codigo, nombre, estado, vigenciaHasta, fechaAutorizacion, autorizadoPor, observaciones,
-        sucursalesHabilitadas, incidencias:[], foto: fotoEntrenadorActual,
+        sucursalesHabilitadas, incidencias:[],
         creadoPor:currentUser.name, creadoEn:new Date().toISOString(),
       });
       await registrarAuditoria('entrenador', ref.id, nombre, 'Entrenador registrado (alta inicial)', '');
@@ -2093,17 +2023,14 @@ window.buscarHistorialPT = async function(){
       lista.map(s=>`
       <div class="sesion-card ${s.estado==='en_curso'?'en-curso':''} ${s.estado==='anulada'?'anulada':''}">
         <div class="sesion-top">
-          <div style="display:flex;align-items:center;gap:10px">
-            ${s.entrenadorFoto?`<img src="${s.entrenadorFoto}" class="entrenador-avatar">`:`<div class="entrenador-avatar entrenador-avatar-vacio">${(s.entrenadorNombre||'?')[0].toUpperCase()}</div>`}
-            <div>
-              <div class="sesion-cliente">${s.cliente}</div>
-              <div class="sesion-entrenador">${s.entrenadorNombre} ${s.entrenadorCodigo?'· '+s.entrenadorCodigo:''}</div>
-            </div>
+          <div>
+            <div class="sesion-cliente">${s.cliente}</div>
+            <div class="sesion-entrenador">${s.entrenadorNombre} ${s.entrenadorCodigo?'· '+s.entrenadorCodigo:''}</div>
           </div>
           <span class="estado-badge estado-${s.estado}">${estadoSesionLabel(s.estado)}</span>
         </div>
-        <div class="sesion-hora">🕐 ${s.fecha} · ${s.horaInicio}${s.horaFin?' – '+s.horaFin:''} ${!s.horaFin?'<span class="sesion-hora-curso">en curso</span>':''}</div>
         <div class="sesion-meta">
+          ${s.fecha} · ${s.horaInicio}${s.horaFin?' – '+s.horaFin:' – en curso'} ·
           Cliente ${estadoClienteLabel(s.estadoCliente)} · Registró: ${s.recepcionista}
         </div>
         ${s.observaciones?`<div class="sesion-obs">${s.observaciones}</div>`:''}
@@ -2546,7 +2473,7 @@ window.cambiarVistaOps = function(vista){
   document.querySelectorAll('#switch-ops .clases-switch-btn').forEach(b=>b.classList.remove('active'));
   const btn = document.querySelector(`#switch-ops [data-vista="${vista}"]`);
   if(btn) btn.classList.add('active');
-  ['dashboard','incidencias','bitacora','checklist','inspecciones','mantenimiento','gastos','expediente'].forEach(v=>{
+  ['dashboard','incidencias','bitacora','checklist','inspecciones','mantenimiento','gastos'].forEach(v=>{
     document.getElementById(`ops-${v}-container`).style.display = v===vista?'block':'none';
   });
   document.getElementById('btn-nueva-incidencia').style.display = vista==='incidencias'?'inline-flex':'none';
@@ -2555,7 +2482,6 @@ window.cambiarVistaOps = function(vista){
   document.getElementById('btn-nueva-inspeccion').style.display = vista==='inspecciones'?'inline-flex':'none';
   document.getElementById('btn-nuevo-mantenimiento').style.display = vista==='mantenimiento'?'inline-flex':'none';
   document.getElementById('btn-nuevo-gasto').style.display = vista==='gastos'?'inline-flex':'none';
-  document.getElementById('btn-editar-expediente').style.display = vista==='expediente'?'inline-flex':'none';
 
   if(vista==='dashboard')   renderDashboardOps();
   if(vista==='incidencias') renderIncidencias();
@@ -2564,7 +2490,6 @@ window.cambiarVistaOps = function(vista){
   if(vista==='inspecciones')    cargarInspecciones();
   if(vista==='mantenimiento')   cargarMantenimiento();
   if(vista==='gastos')          cargarGastos();
-  if(vista==='expediente')      cargarExpediente();
 };
 
 // ------------------------------------------------------------
@@ -3208,145 +3133,6 @@ window.guardarGasto = async function(){
     closeModal('modal-gasto');
     showToast('Gasto registrado');
     renderGastos();
-  } catch(e){ showToast('Error al guardar','err'); }
-  hideLoading();
-};
-
-// ============================================================
-// EXPEDIENTE POR SUCURSAL — junta en una sola vista todo lo que
-// ya se carga en Operaciones (pendientes, gastos, bitácora, fotos)
-// más los datos propios del local (dirección, infraestructura,
-// equipamiento, personal). Organizado por secciones en una sola
-// página, en vez de pestañas dentro de pestañas, para no sumar
-// otro nivel más de navegación.
-// ============================================================
-let expedienteData = null;
-
-async function cargarExpediente(){
-  showLoading();
-  try{
-    const snap = await getDoc(doc(db,'sucursales_info',currentSuc));
-    expedienteData = snap.exists() ? snap.data() : {};
-    await cargarUsuarios(); // llena el arreglo global `usuarios` de esta sucursal
-  } catch(e){ expedienteData = {}; }
-  hideLoading();
-  renderExpediente();
-}
-
-function renderExpediente(){
-  const cont = document.getElementById('ops-expediente-container');
-  const e = expedienteData || {};
-
-  const pendientes = incidenciasData.filter(i=>i.estado==='abierta'||i.estado==='en_proceso');
-  const gastoTotal = gastosData.reduce((acc,g)=>acc+(g.monto||0),0);
-  const equipamientoLista = (e.equipamiento||'').split('\n').map(x=>x.trim()).filter(Boolean);
-
-  // Galería: junta todas las fotos que ya existen en incidencias,
-  // mantenimiento y gastos de esta sucursal
-  const fotos = [];
-  incidenciasData.forEach(i=>{
-    if(i.fotoAntes) fotos.push({src:i.fotoAntes, label:`${i.codigo} — antes`});
-    if(i.fotoDurante) fotos.push({src:i.fotoDurante, label:`${i.codigo} — durante`});
-    if(i.fotoDespues) fotos.push({src:i.fotoDespues, label:`${i.codigo} — después`});
-  });
-  mantenimientoData.forEach(m=>{ if(m.foto) fotos.push({src:m.foto, label:m.maquina}); });
-  gastosData.forEach(g=>{ if(g.foto) fotos.push({src:g.foto, label:g.concepto}); });
-
-  // Actividad reciente: mezcla incidencias + bitácora + mantenimiento,
-  // ordenado del más nuevo al más viejo
-  const actividad = [
-    ...incidenciasData.map(i=>({fecha:i.fecha, texto:`Incidencia ${i.codigo}: ${i.titulo}`, ts:i.creadoEn})),
-    ...bitacoraData.map(b=>({fecha:b.fecha, texto:b.texto, ts:b.creadoEn})),
-    ...mantenimientoData.map(m=>({fecha:m.fecha, texto:`Mantenimiento: ${m.maquina}`, ts:m.creadoEn})),
-  ].sort((a,b)=>(b.ts||'').localeCompare(a.ts||'')).slice(0,10);
-
-  cont.innerHTML = `
-    <div class="rep-section-title">Información general</div>
-    <div class="expediente-info-grid">
-      <div><span class="stat-label">Dirección</span><div>${e.direccion||'—'}</div></div>
-      <div><span class="stat-label">Teléfono</span><div>${e.telefono||'—'}</div></div>
-      <div><span class="stat-label">Horario</span><div>${e.horario||'—'}</div></div>
-      <div><span class="stat-label">Encargado</span><div>${e.encargado||'—'}</div></div>
-    </div>
-    ${e.observaciones?`<div class="evento-desc" style="margin-top:8px">${e.observaciones}</div>`:''}
-
-    <div class="rep-section-title">Infraestructura</div>
-    <div class="evento-desc">${e.infraestructura||'Sin información cargada todavía.'}</div>
-
-    <div class="rep-section-title">Equipamiento</div>
-    ${equipamientoLista.length
-      ? `<div class="incidencia-tags">${equipamientoLista.map(x=>`<span class="suc-tag-mini">${x}</span>`).join('')}</div>`
-      : `<div class="empty">Sin equipamiento cargado todavía.</div>`}
-
-    <div class="rep-section-title">Personal (${usuarios.length})</div>
-    ${usuarios.length ? usuarios.map(u=>`
-      <div class="bitacora-row">
-        <span class="bitacora-fecha">${u.role}</span>
-        <span class="bitacora-texto">${u.name}</span>
-        <span class="bitacora-autor">${turnoLabel(u.turno)}</span>
-      </div>`).join('') : '<div class="empty">Sin personal asignado en el sistema todavía.</div>'}
-
-    <div class="rep-section-title">Pendientes (${pendientes.length})</div>
-    ${pendientes.length ? pendientes.slice(0,6).map(i=>`
-      <div class="incidencia-card" onclick="cambiarVistaOps('incidencias')" style="margin-bottom:6px">
-        <div class="incidencia-top">
-          <div class="incidencia-titulo">${i.codigo} — ${i.titulo}</div>
-          <span class="prioridad-tag prioridad-${i.prioridad}">${prioridadIncidenciaLabel(i.prioridad)}</span>
-        </div>
-      </div>`).join('') : '<div class="empty">Sin pendientes abiertos ✓</div>'}
-
-    <div class="rep-section-title">Gastos (Bs ${gastoTotal.toFixed(2)} en total)</div>
-    ${gastosData.length ? gastosData.slice(0,5).map(g=>`
-      <div class="bitacora-row">
-        <span class="bitacora-fecha">${g.fecha}</span>
-        <span class="bitacora-texto">${g.concepto}</span>
-        <span class="bitacora-autor">Bs ${g.monto}</span>
-      </div>`).join('') : '<div class="empty">Sin gastos registrados</div>'}
-
-    <div class="rep-section-title">Fotos (${fotos.length})</div>
-    ${fotos.length ? `<div class="expediente-galeria">${fotos.slice(0,12).map(f=>`
-      <img src="${f.src}" title="${f.label}" onclick="window.open('${f.src}')">`).join('')}</div>`
-      : '<div class="empty">Sin fotos guardadas todavía</div>'}
-
-    <div class="rep-section-title">Actividad reciente</div>
-    ${actividad.length ? actividad.map(a=>`
-      <div class="bitacora-row">
-        <span class="bitacora-fecha">${a.fecha}</span>
-        <span class="bitacora-texto">${a.texto}</span>
-      </div>`).join('') : '<div class="empty">Sin actividad registrada</div>'}
-  `;
-}
-
-window.abrirModalExpediente = function(){
-  const e = expedienteData || {};
-  document.getElementById('exp-direccion').value = e.direccion||'';
-  document.getElementById('exp-telefono').value = e.telefono||'';
-  document.getElementById('exp-horario').value = e.horario||'';
-  document.getElementById('exp-encargado').value = e.encargado||'';
-  document.getElementById('exp-infraestructura').value = e.infraestructura||'';
-  document.getElementById('exp-equipamiento').value = e.equipamiento||'';
-  document.getElementById('exp-observaciones').value = e.observaciones||'';
-  document.getElementById('modal-expediente').classList.add('open');
-};
-
-window.guardarExpediente = async function(){
-  const data = {
-    direccion: document.getElementById('exp-direccion').value.trim(),
-    telefono: document.getElementById('exp-telefono').value.trim(),
-    horario: document.getElementById('exp-horario').value.trim(),
-    encargado: document.getElementById('exp-encargado').value.trim(),
-    infraestructura: document.getElementById('exp-infraestructura').value.trim(),
-    equipamiento: document.getElementById('exp-equipamiento').value.trim(),
-    observaciones: document.getElementById('exp-observaciones').value.trim(),
-    actualizadoPor: currentUser.name, actualizadoEn: new Date().toISOString(),
-  };
-  showLoading();
-  try{
-    await setDoc(doc(db,'sucursales_info',currentSuc), data, {merge:true});
-    expedienteData = data;
-    closeModal('modal-expediente');
-    showToast('Información guardada');
-    renderExpediente();
   } catch(e){ showToast('Error al guardar','err'); }
   hideLoading();
 };

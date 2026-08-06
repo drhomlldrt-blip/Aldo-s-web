@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260729a">
+<link rel="stylesheet" href="styles.css?v=20260728c">
 </head>
 <body>
 
@@ -80,7 +80,6 @@
     </div>
   </div>
   <div class="dash-body">
-    <div class="categorias" id="categorias-container" style="display:none"></div>
     <div class="tabs" id="tabs-container"></div>
     <div id="panel-checklist" class="panel"><div id="checklist-container"></div></div>
     <div id="panel-revision" class="panel">
@@ -189,7 +188,6 @@
           <button class="clases-switch-btn" data-vista="inspecciones" onclick="cambiarVistaOps('inspecciones')">Inspecciones</button>
           <button class="clases-switch-btn" data-vista="mantenimiento" onclick="cambiarVistaOps('mantenimiento')">Mantenimiento</button>
           <button class="clases-switch-btn" data-vista="gastos" onclick="cambiarVistaOps('gastos')">Gastos</button>
-          <button class="clases-switch-btn" data-vista="expediente" onclick="cambiarVistaOps('expediente')">Expediente</button>
         </div>
         <button class="btn-asignar" id="btn-nueva-incidencia" style="display:none" onclick="abrirModalIncidencia()">+ Nueva incidencia</button>
         <button class="btn-asignar" id="btn-nueva-bitacora" style="display:none" onclick="abrirModalBitacora()">+ Nueva entrada</button>
@@ -197,7 +195,6 @@
         <button class="btn-asignar" id="btn-nueva-inspeccion" style="display:none" onclick="crearInspeccion()">+ Nueva inspección</button>
         <button class="btn-asignar" id="btn-nuevo-mantenimiento" style="display:none" onclick="abrirModalMantenimiento()">+ Nuevo mantenimiento</button>
         <button class="btn-asignar" id="btn-nuevo-gasto" style="display:none" onclick="abrirModalGasto()">+ Nuevo gasto</button>
-        <button class="btn-asignar" id="btn-editar-expediente" style="display:none" onclick="abrirModalExpediente()">Editar información</button>
       </div>
 
       <div id="ops-dashboard-container"></div>
@@ -259,32 +256,6 @@
         </div>
         <div id="ops-gastos-lista"></div>
       </div>
-
-      <div id="ops-expediente-container" style="display:none"></div>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL EDITAR INFORMACIÓN DE LA SUCURSAL -->
-<div class="modal-overlay" id="modal-expediente">
-  <div class="modal modal-wide">
-    <div class="modal-title">Información de la sucursal</div>
-    <div class="field-row">
-      <div class="field"><label>Dirección</label><input type="text" id="exp-direccion" placeholder="Dirección completa"></div>
-      <div class="field"><label>Teléfono</label><input type="text" id="exp-telefono" placeholder="Número de contacto"></div>
-    </div>
-    <div class="field-row">
-      <div class="field"><label>Horario de atención</label><input type="text" id="exp-horario" placeholder="Ej: 06:00 - 22:30"></div>
-      <div class="field"><label>Encargado de sucursal</label><input type="text" id="exp-encargado" placeholder="Nombre"></div>
-    </div>
-    <div class="field"><label>Infraestructura</label><textarea id="exp-infraestructura" placeholder="Metraje, plantas, distribución general..."></textarea></div>
-    <div class="field"><label>Equipamiento (un ítem por línea)</label><textarea id="exp-equipamiento" placeholder="10 trotadoras
-6 bicicletas de spinning
-Sala de pesas completa..."></textarea></div>
-    <div class="field"><label>Observaciones generales</label><textarea id="exp-observaciones" placeholder="Cualquier otra nota relevante..."></textarea></div>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeModal('modal-expediente')">Cancelar</button>
-      <button class="btn-send" onclick="guardarExpediente()">Guardar</button>
     </div>
   </div>
 </div>
@@ -513,7 +484,6 @@ Sala de pesas completa..."></textarea></div>
   <div class="modal">
     <div class="modal-title">Registrar sesión</div>
     <div class="modal-sub">Entrenador personal + cliente</div>
-    <div class="hora-registro-aviso">🕐 Se registrará como hora de ingreso: <strong id="sesion-hora-actual"></strong></div>
     <div class="field"><label>Entrenador</label><select id="sesion-entrenador"></select></div>
     <div class="field"><label>Cliente</label><input type="text" id="sesion-cliente" placeholder="Nombre del cliente"></div>
     <div class="field"><label>Estado del cliente</label>
@@ -537,19 +507,6 @@ Sala de pesas completa..."></textarea></div>
   <div class="modal">
     <div class="modal-title" id="modal-entrenador-titulo">Nuevo entrenador</div>
     <input type="hidden" id="entrenador-id-edit">
-    <div class="field">
-      <label>Foto de perfil</label>
-      <div style="display:flex;align-items:center;gap:12px">
-        <img id="entrenador-foto-preview" class="entrenador-avatar-grande" style="display:none">
-        <div id="entrenador-foto-placeholder" class="entrenador-avatar-grande entrenador-avatar-vacio">👤</div>
-        <div class="foto-btns" style="flex:1">
-          <button type="button" class="btn-foto" onclick="document.getElementById('entrenador-foto-cam').click()">📷 Tomar foto</button>
-          <button type="button" class="btn-foto" onclick="document.getElementById('entrenador-foto-gal').click()">🖼 Galería</button>
-        </div>
-      </div>
-      <input type="file" id="entrenador-foto-cam" accept="image/*" capture="environment" style="display:none" onchange="previewFotoEntrenador(this)">
-      <input type="file" id="entrenador-foto-gal" accept="image/*" style="display:none" onchange="previewFotoEntrenador(this)">
-    </div>
     <div class="field"><label>Código único</label><input type="text" id="entrenador-codigo" placeholder="Ej: PT-001"></div>
     <div class="field"><label>Nombre completo</label><input type="text" id="entrenador-nombre" placeholder="Nombre y apellido"></div>
     <div class="field-row">
@@ -824,7 +781,7 @@ Sala de pesas completa..."></textarea></div>
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20260729a"></script>
+<script type="module" src="app.js?v=20260728c"></script>
 <!-- VISOR DE FOTO A PANTALLA COMPLETA (con zoom y forma clara de salir) -->
 <div class="modal-overlay" id="modal-foto-viewer" onclick="if(event.target===this) cerrarFotoGrande()">
   <div class="foto-viewer-content">
