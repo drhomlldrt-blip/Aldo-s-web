@@ -837,3 +837,63 @@ textarea:focus{border-color:var(--neon)}
 .btn-cal-regular.activo{background:var(--warn);color:#fff}
 .btn-cal-malo.activo{background:#ff5a32;color:#fff}
 .btn-cal-critico.activo{background:var(--danger);color:#fff}
+
+/* ===================== NAVEGACIÓN EN 2 NIVELES ===================== */
+.categorias{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.categoria-btn{
+  display:flex;align-items:center;gap:6px;
+  background:var(--surface);background-image:var(--card-texture);border:1px solid var(--border2);
+  border-radius:10px;padding:10px 16px;font-size:12.5px;font-weight:600;color:var(--text2);
+  cursor:pointer;transition:all .2s;box-shadow:0 1px 0 rgba(255,255,255,0.04) inset, 0 3px 8px rgba(0,0,0,0.25);
+}
+.categoria-btn:hover{border-color:var(--neon);color:var(--text)}
+.categoria-btn.active{
+  background:linear-gradient(180deg,var(--neon2),var(--neon));color:#fff;border-color:transparent;
+  box-shadow:var(--btn-shadow);
+}
+.cat-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:18px;height:18px;padding:0 5px;border-radius:9px;
+  background:var(--danger);color:#fff;font-size:10px;font-weight:700;
+}
+
+/* ===================== EXPEDIENTE POR SUCURSAL ===================== */
+.expediente-info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-top:8px}
+.expediente-info-grid > div{font-size:13px;color:var(--text)}
+.expediente-galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-top:6px}
+.expediente-galeria img{
+  width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;cursor:pointer;
+  border:1px solid var(--border2);transition:transform .2s;
+}
+.expediente-galeria img:hover{transform:scale(1.05);border-color:var(--neon)}
+
+/* ===================== ENTRENADORES: FOTO DE PERFIL ===================== */
+.entrenador-avatar{
+  width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;
+  border:2px solid var(--border2);
+}
+.entrenador-avatar-vacio{
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(160deg,var(--surface2),var(--surface3));
+  color:var(--gray);font-weight:700;font-size:15px;
+}
+.entrenador-avatar-grande{
+  width:64px;height:64px;border-radius:50%;object-fit:cover;flex-shrink:0;
+  border:2px solid var(--border2);font-size:26px;
+}
+
+/* ===================== SESIÓN: HORA DESTACADA ===================== */
+.sesion-hora{
+  font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.5px;
+  color:var(--neon);margin:6px 0;
+}
+.sesion-hora-curso{
+  font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;letter-spacing:.3px;
+  text-transform:uppercase;color:var(--warn);background:rgba(255,136,0,.12);
+  padding:2px 8px;border-radius:8px;margin-left:6px;
+}
+.hora-registro-aviso{
+  background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);border-radius:8px;
+  padding:9px 12px;font-size:12px;color:var(--text2);margin-bottom:16px;
+}
+.hora-registro-aviso strong{color:var(--neon);font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:.5px}
