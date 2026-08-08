@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260729b">
+<link rel="stylesheet" href="styles.css?v=20260729c">
 </head>
 <body>
 
@@ -76,7 +76,21 @@
     <div style="display:flex;align-items:center;gap:8px">
       <span class="topbar-role" id="dash-role"></span>
       <button id="btn-cambiar-suc" class="btn-cambiar-suc" onclick="cambiarSucursal()" style="display:none">⇄ Sucursal</button>
+      <button class="btn-cambiar-suc" onclick="abrirModalSesiones()">🔒 Sesiones</button>
       <button class="btn-logout" onclick="doLogout()">Salir</button>
+    </div>
+  </div>
+
+  <!-- MODAL SESIONES ACTIVAS -->
+  <div class="modal-overlay" id="modal-sesiones">
+    <div class="modal modal-wide">
+      <div class="modal-title">Sesiones activas</div>
+      <div class="modal-sub">Todos los dispositivos donde iniciaste sesión con tu usuario. Si dejaste una abierta en otra computadora, la podés cerrar desde acá.</div>
+      <div id="sesiones-lista"><div class="empty">Cargando...</div></div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeModal('modal-sesiones')">Cerrar</button>
+        <button class="btn-send" onclick="cerrarTodasLasDemasSesiones()">Cerrar todas las demás</button>
+      </div>
     </div>
   </div>
   <div class="dash-body">
@@ -824,7 +838,7 @@ Sala de pesas completa..."></textarea></div>
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20260729b"></script>
+<script type="module" src="app.js?v=20260729c"></script>
 <!-- VISOR DE FOTO A PANTALLA COMPLETA (con zoom y forma clara de salir) -->
 <div class="modal-overlay" id="modal-foto-viewer" onclick="if(event.target===this) cerrarFotoGrande()">
   <div class="foto-viewer-content">

@@ -897,3 +897,12 @@ textarea:focus{border-color:var(--neon)}
   padding:9px 12px;font-size:12px;color:var(--text2);margin-bottom:16px;
 }
 .hora-registro-aviso strong{color:var(--neon);font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:.5px}
+
+/* ===================== SESIONES ACTIVAS ===================== */
+.sesion-dispositivo-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:12px 14px;border-bottom:1px solid var(--border);
+}
+.sesion-dispositivo-row:last-child{border-bottom:none}
+.sesion-dispositivo-nombre{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sesion-dispositivo-meta{font-size:11px;color:var(--gray);margin-top:2px}

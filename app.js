@@ -139,7 +139,10 @@ window.doLogin = async function(){
   } catch(e){ hideLoading(); err.textContent='Error de conexión'; err.style.display='block'; }
 };
 
-window.doLogout = function(){ currentUser=null; reportes=[]; usuarios=[]; borrarSesion(); goHome(); };
+window.doLogout = function(){
+  try{ updateDoc(doc(db,'sesiones_activas', idDispositivoActual()), {activa:false}); }catch(e){}
+  currentUser=null; reportes=[]; usuarios=[]; borrarSesion(); goHome();
+};
 document.getElementById('inp-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 
 // ============================================================
@@ -1657,9 +1660,51 @@ window.borrarEspecial=async function(){
 // ============================================================
 const SESSION_KEY = 'gymControlSesion';
 const SESSION_PANEL_KEY = 'gymControlPanelActivo';
+const DEVICE_SESSION_KEY = 'gymControlDeviceSessionId';
+
+function idDispositivoActual(){
+  let id = null;
+  try{ id = localStorage.getItem(DEVICE_SESSION_KEY); }catch(e){}
+  if(!id){
+    id = 'ses_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,10);
+    try{ localStorage.setItem(DEVICE_SESSION_KEY, id); }catch(e){}
+  }
+  return id;
+}
+
+function nombreDispositivo(){
+  const ua = navigator.userAgent||'';
+  let so = 'Dispositivo';
+  if(/Windows/.test(ua)) so='Windows';
+  else if(/Android/.test(ua)) so='Android';
+  else if(/iPhone|iPad/.test(ua)) so='iPhone/iPad';
+  else if(/Mac/.test(ua)) so='Mac';
+  else if(/Linux/.test(ua)) so='Linux';
+  let nav = 'navegador';
+  if(/Edg\//.test(ua)) nav='Edge';
+  else if(/Chrome\//.test(ua)) nav='Chrome';
+  else if(/Firefox\//.test(ua)) nav='Firefox';
+  else if(/Safari\//.test(ua)) nav='Safari';
+  return `${so} · ${nav}`;
+}
+
+// Registra (o actualiza) este dispositivo como una sesión activa del
+// usuario, para que después pueda verla y cerrarla a distancia desde
+// cualquier otro dispositivo.
+async function registrarSesionActiva(){
+  if(!currentUser) return;
+  try{
+    await setDoc(doc(db,'sesiones_activas', idDispositivoActual()),{
+      username: currentUser.username||currentUser.name, nombre: currentUser.name, rol: currentUser.role,
+      sucursal: currentSuc, dispositivo: nombreDispositivo(),
+      activa: true, iniciadoEn: new Date().toISOString(), ultimaActividad: new Date().toISOString(),
+    }, {merge:true});
+  } catch(e){}
+}
 
 function guardarSesion(){
   try{ localStorage.setItem(SESSION_KEY, JSON.stringify({ user: currentUser, suc: currentSuc })); }catch(e){}
+  registrarSesionActiva();
 }
 function borrarSesion(){
   try{ localStorage.removeItem(SESSION_KEY); localStorage.removeItem(SESSION_PANEL_KEY); }catch(e){}
@@ -1674,6 +1719,7 @@ function guardarPanelActivo(panelId){
   if(!guardada || !guardada.user || !guardada.suc) return;
   currentUser = guardada.user;
   currentSuc  = guardada.suc;
+  registrarSesionActiva();
   showLoading();
   try{
     await loadDash();
@@ -1714,10 +1760,82 @@ setInterval(async ()=>{
   if(currentUser.role==='limpieza'){
     try{ await cargarReportes(); }catch(e){}
   }
+  // Late (mantiene la sesión "viva") y revisa si alguien la cerró
+  // desde otro dispositivo — si es así, te saca de acá también.
+  try{
+    const idSesion = idDispositivoActual();
+    const snap = await getDoc(doc(db,'sesiones_activas', idSesion));
+    if(snap.exists() && snap.data().activa===false){
+      borrarSesion();
+      currentUser=null; reportes=[]; usuarios=[];
+      goHome();
+      showToast('Tu sesión fue cerrada desde otro dispositivo','err');
+      return;
+    }
+    await updateDoc(doc(db,'sesiones_activas', idSesion), {ultimaActividad:new Date().toISOString()});
+  }catch(e){}
 }, 60000);
 
 // ============================================================
-// AUTO-ACTUALIZACIÓN
+// SESIONES ACTIVAS — ver en qué dispositivos está iniciada la
+// sesión de este usuario, y poder cerrarlas a distancia (útil si
+// se dejó una abierta en una compu compartida de otra sucursal).
+// ============================================================
+function tiempoDesde(fechaISO){
+  if(!fechaISO) return '';
+  const min = Math.round((Date.now()-new Date(fechaISO).getTime())/60000);
+  if(min<1) return 'justo ahora';
+  if(min<60) return `hace ${min} min`;
+  const h = Math.round(min/60);
+  if(h<24) return `hace ${h}h`;
+  return `hace ${Math.round(h/24)}d`;
+}
+
+window.abrirModalSesiones = async function(){
+  document.getElementById('modal-sesiones').classList.add('open');
+  const cont = document.getElementById('sesiones-lista');
+  cont.innerHTML = '<div class="empty">Cargando...</div>';
+  try{
+    const username = currentUser.username||currentUser.name;
+    const q = query(collection(db,'sesiones_activas'), where('username','==',username), where('activa','==',true));
+    const snap = await getDocs(q);
+    const propia = idDispositivoActual();
+    const sesiones = snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.ultimaActividad||'').localeCompare(a.ultimaActividad||''));
+    if(!sesiones.length){ cont.innerHTML='<div class="empty">Sin sesiones activas registradas</div>'; return; }
+    cont.innerHTML = sesiones.map(s=>`
+      <div class="sesion-dispositivo-row">
+        <div>
+          <div class="sesion-dispositivo-nombre">${s.dispositivo}${s.id===propia?' <span class="cat-badge" style="background:var(--neon)">Este dispositivo</span>':''}</div>
+          <div class="sesion-dispositivo-meta">${s.sucursal} · última actividad ${tiempoDesde(s.ultimaActividad)}</div>
+        </div>
+        ${s.id!==propia?`<button class="btn-sm btn-noatend" onclick="cerrarSesionRemota('${s.id}')">Cerrar</button>`:''}
+      </div>`).join('');
+  } catch(e){ cont.innerHTML='<div class="empty">Error al cargar las sesiones</div>'; }
+};
+
+window.cerrarSesionRemota = async function(sessionId){
+  if(!confirm('¿Cerrar esa sesión? Esa pantalla va a volver sola al inicio en menos de un minuto.')) return;
+  try{
+    await updateDoc(doc(db,'sesiones_activas', sessionId), {activa:false});
+    showToast('Sesión cerrada');
+    abrirModalSesiones();
+  } catch(e){ showToast('Error al cerrar la sesión','err'); }
+};
+
+window.cerrarTodasLasDemasSesiones = async function(){
+  if(!confirm('¿Cerrar todas tus sesiones abiertas en otros dispositivos?')) return;
+  try{
+    const username = currentUser.username||currentUser.name;
+    const propia = idDispositivoActual();
+    const q = query(collection(db,'sesiones_activas'), where('username','==',username), where('activa','==',true));
+    const snap = await getDocs(q);
+    await Promise.all(snap.docs.filter(d=>d.id!==propia).map(d=>updateDoc(doc(db,'sesiones_activas',d.id),{activa:false})));
+    showToast('Se cerraron las demás sesiones');
+    abrirModalSesiones();
+  } catch(e){ showToast('Error','err'); }
+};
+
+
 // Antes: si alguien dejaba la pestaña abierta varios días, el
 // navegador nunca volvía a pedir una copia nueva de app.js aunque
 // yo subiera una corrección — se quedaba corriendo el código
@@ -1725,7 +1843,7 @@ setInterval(async ()=>{
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260729b';
+const APP_VERSION = '20260729c';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
