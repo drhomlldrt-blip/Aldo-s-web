@@ -445,6 +445,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   background:none;color:var(--danger);transition:all .2s;
 }
 .btn-del:hover{background:rgba(255,51,51,0.1)}
+.btn-sesion{
+  font-size:11px;border:1px solid rgba(107,33,168,0.5);border-radius:6px;
+  padding:5px 12px;cursor:pointer;font-family:'DM Sans',sans-serif;
+  background:none;color:var(--accent);transition:all .2s;white-space:nowrap;
+}
+.btn-sesion:hover{background:rgba(107,33,168,0.15)}
 .add-user-btn{
   width:100%;border:1px dashed var(--border2);background:none;
   border-radius:var(--radius);padding:13px;color:var(--gray);

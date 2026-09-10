@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260729c">
+<link rel="stylesheet" href="styles.css?v=20260909a">
 </head>
 <body>
 
@@ -20,31 +20,44 @@
     </div>
     <div class="suc-label">Selecciona tu sucursal</div>
     <div class="suc-grid">
-      <div class="suc-card" onclick="selectSuc('SATÉLITE')">
-        <div class="suc-num">01</div>
-        <div class="suc-name">Satélite</div>
-        <div class="suc-tag">SUCURSAL</div>
-      </div>
       <div class="suc-card" onclick="selectSuc('16 DE JULIO')">
-        <div class="suc-num">02</div>
+        <div class="suc-num">01</div>
         <div class="suc-name">16 de Julio</div>
         <div class="suc-tag">SUCURSAL</div>
       </div>
       <div class="suc-card" onclick="selectSuc('UPEA')">
-        <div class="suc-num">03</div>
+        <div class="suc-num">02</div>
         <div class="suc-name">UPEA</div>
         <div class="suc-tag">SUCURSAL</div>
       </div>
-      <div class="suc-card" onclick="selectSuc('CRUCE V. ADELA')">
+      <div class="suc-card" onclick="selectSuc('MIRAFLORES')">
+        <div class="suc-num">03</div>
+        <div class="suc-name">Miraflores</div>
+        <div class="suc-tag">SUCURSAL</div>
+      </div>
+      <!--
+        INACTIVAS (2026-09) — no se eliminaron, solo se sacaron de esta
+        pantalla para que el personal no pueda seleccionarlas ni iniciar
+        sesión ahí. Sus datos (usuarios, reportes, checklists, historial)
+        siguen intactos en Firestore. Para reactivar una sucursal, solo
+        hay que volver a pegar su bloque acá adentro del suc-grid.
+
+      <div class="suc-card" onclick="selectSuc('SATÉLITE')">
         <div class="suc-num">04</div>
+        <div class="suc-name">Satélite</div>
+        <div class="suc-tag">SUCURSAL</div>
+      </div>
+      <div class="suc-card" onclick="selectSuc('CRUCE V. ADELA')">
+        <div class="suc-num">05</div>
         <div class="suc-name">Cruce V. Adela</div>
         <div class="suc-tag">SUCURSAL</div>
       </div>
       <div class="suc-card" onclick="selectSuc('CEJA')">
-        <div class="suc-num">05</div>
+        <div class="suc-num">06</div>
         <div class="suc-name">Ceja</div>
         <div class="suc-tag">SUCURSAL</div>
       </div>
+      -->
     </div>
   </div>
 </div>
@@ -838,7 +851,7 @@ Sala de pesas completa..."></textarea></div>
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20260729c"></script>
+<script type="module" src="app.js?v=20260909a"></script>
 <!-- VISOR DE FOTO A PANTALLA COMPLETA (con zoom y forma clara de salir) -->
 <div class="modal-overlay" id="modal-foto-viewer" onclick="if(event.target===this) cerrarFotoGrande()">
   <div class="foto-viewer-content">

@@ -3,11 +3,12 @@
 // ============================================================
 import { db } from './firebase.js';
 import { USERS_FIJOS } from './usuarios.js';
-import * as SATELITE from './data/satelite.js';
-import * as UPEA     from './data/upea.js';
-import * as JUL16     from './data/jul16.js';
-import * as CEJA      from './data/ceja.js';
-import * as CRUCE     from './data/cruce.js';
+import * as SATELITE   from './data/satelite.js';
+import * as UPEA       from './data/upea.js';
+import * as JUL16      from './data/jul16.js';
+import * as CEJA       from './data/ceja.js';
+import * as CRUCE      from './data/cruce.js';
+import * as MIRAFLORES from './data/miraflores.js';
 import {
   collection, doc, setDoc, getDoc, getDocs,
   updateDoc, deleteDoc, query, where
@@ -19,8 +20,16 @@ import {
 // EXACTO con el valor que manda selectSuc() en index.html.
 // Para agregar otra sucursal: importa su archivo arriba y
 // agrégalo a este arreglo.
+//
+// SATELITE, CEJA y CRUCE quedaron INACTIVAS (2026-09): ya no
+// aparecen como tarjeta seleccionable en la pantalla de inicio
+// (ver index.html), pero se mantienen aquí a propósito para no
+// perder su checklist ni su historial — reportes, checklists y
+// usuarios viejos de esas sucursales se pueden seguir revisando.
+// Si alguna vuelve a operar, solo hay que reactivar su tarjeta
+// en index.html.
 // ============================================================
-const SUCURSALES_DATA = [SATELITE, UPEA, JUL16, CEJA, CRUCE];
+const SUCURSALES_DATA = [SATELITE, UPEA, JUL16, CEJA, CRUCE, MIRAFLORES];
 
 const TAREAS_POR_SUCURSAL = {};
 const AREAS_POR_SUCURSAL  = {};
@@ -1038,10 +1047,32 @@ async function cargarUsuarios(){
         <div class="user-name">${u.name}</div>
         <div class="user-detail">@${u.id} · <span style="${roleColor[u.role]||''}">${u.role}</span> · ${turnoLabel(u.turno)}</div>
       </div>
+      <button class="btn-sesion" onclick="cerrarSesionDeUsuario('${u.id}')">Cerrar sesión</button>
       <button class="btn-del" onclick="eliminarUsuario('${u.id}')">Dar de baja</button>
     </div>`).join('');
   cont.innerHTML=html;
 }
+
+// Cierra (a distancia) todas las sesiones activas de un usuario, sin
+// eliminar su cuenta. Útil para personal momentáneo: aunque siga
+// existiendo el usuario, no puede seguir usando la app hasta que
+// vuelva a iniciar sesión. El dispositivo afectado sale solo en
+// menos de un minuto (el mismo chequeo periódico que usa "Sesiones
+// activas" en el menú del propio usuario).
+window.cerrarSesionDeUsuario=async function(username){
+  if(!confirm(`¿Cerrar la sesión activa de @${username}? Si tiene la app abierta en algún dispositivo, va a volver sola al inicio.`)) return;
+  showLoading();
+  try {
+    const q=query(collection(db,'sesiones_activas'),where('username','==',username),where('activa','==',true));
+    const snap=await getDocs(q);
+    if(snap.empty){ showToast('Ese usuario no tiene sesiones activas'); }
+    else {
+      await Promise.all(snap.docs.map(d=>updateDoc(doc(db,'sesiones_activas',d.id),{activa:false})));
+      showToast('Sesión cerrada');
+    }
+  } catch(e){ showToast('Error al cerrar la sesión','err'); }
+  hideLoading();
+};
 
 window.showAddUserModal=function(){
   ['new-name','new-user','new-pass'].forEach(id=>document.getElementById(id).value='');
@@ -1066,12 +1097,22 @@ window.saveNewUser=async function(){
 };
 
 window.eliminarUsuario=async function(id){
-  if(!confirm(`¿Dar de baja al usuario @${id}?`)) return;
+  if(!confirm(`¿Dar de baja al usuario @${id}? Si tiene la app abierta en algún dispositivo, se le va a cerrar la sesión automáticamente.`)) return;
   showLoading();
   try {
+    // Antes, dar de baja solo borraba el usuario de Firestore: si la
+    // persona ya había iniciado sesión en un dispositivo, se quedaba
+    // con acceso hasta que ella misma cerrara sesión. Ahora, al dar
+    // de baja, también se cierran todas sus sesiones activas para
+    // que quede sin acceso de inmediato (en menos de un minuto).
+    try {
+      const q=query(collection(db,'sesiones_activas'),where('username','==',id),where('activa','==',true));
+      const snap=await getDocs(q);
+      await Promise.all(snap.docs.map(d=>updateDoc(doc(db,'sesiones_activas',d.id),{activa:false})));
+    } catch(e){ /* si esto falla igual seguimos con la baja del usuario */ }
     await deleteDoc(doc(db,'usuarios',id));
     await cargarUsuarios();
-    showToast('Usuario dado de baja');
+    showToast('Usuario dado de baja y sesión cerrada');
   } catch(e){ showToast('Error','err'); }
   hideLoading();
 };
@@ -1843,7 +1884,7 @@ window.cerrarTodasLasDemasSesiones = async function(){
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260729c';
+const APP_VERSION = '20260909a';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
