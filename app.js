@@ -1937,7 +1937,7 @@ window.cerrarTodasLasDemasSesiones = async function(){
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260915c';
+const APP_VERSION = '20260915d';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
@@ -2033,7 +2033,7 @@ function renderSesionesPT(){
     <div class="sesion-card ${s.estado==='en_curso'?'en-curso':''} ${s.estado==='anulada'?'anulada':''}">
       <div class="sesion-top">
         <div style="display:flex;align-items:center;gap:10px">
-          ${s.entrenadorFoto?`<img src="${s.entrenadorFoto}" class="entrenador-avatar">`:`<div class="entrenador-avatar entrenador-avatar-vacio">${(s.entrenadorNombre||'?')[0].toUpperCase()}</div>`}
+          ${s.entrenadorFoto?`<img src="${s.entrenadorFoto}" class="entrenador-avatar zoomable-img">`:`<div class="entrenador-avatar entrenador-avatar-vacio">${(s.entrenadorNombre||'?')[0].toUpperCase()}</div>`}
           <div>
             <div class="sesion-cliente">${s.cliente}</div>
             <div class="sesion-entrenador">${s.entrenadorNombre} ${s.entrenadorCodigo?'· '+s.entrenadorCodigo:''}</div>
@@ -2145,7 +2145,7 @@ function renderEntrenadoresPT(){
     <div class="entrenador-card" ${esSup?`onclick="abrirModalEntrenador('${e.id}')"`:''}>
       <div class="entrenador-top">
         <div style="display:flex;align-items:center;gap:12px">
-          ${e.foto?`<img src="${e.foto}" class="entrenador-avatar">`:`<div class="entrenador-avatar entrenador-avatar-vacio">${(e.nombre||'?')[0].toUpperCase()}</div>`}
+          ${e.foto?`<img src="${e.foto}" class="entrenador-avatar zoomable-img">`:`<div class="entrenador-avatar entrenador-avatar-vacio">${(e.nombre||'?')[0].toUpperCase()}</div>`}
           <div>
             <div class="entrenador-nombre">${e.nombre}</div>
             <div class="entrenador-codigo">${e.codigo}</div>
@@ -2313,7 +2313,7 @@ window.buscarHistorialPT = async function(){
       <div class="sesion-card ${s.estado==='en_curso'?'en-curso':''} ${s.estado==='anulada'?'anulada':''}">
         <div class="sesion-top">
           <div style="display:flex;align-items:center;gap:10px">
-            ${s.entrenadorFoto?`<img src="${s.entrenadorFoto}" class="entrenador-avatar">`:`<div class="entrenador-avatar entrenador-avatar-vacio">${(s.entrenadorNombre||'?')[0].toUpperCase()}</div>`}
+            ${s.entrenadorFoto?`<img src="${s.entrenadorFoto}" class="entrenador-avatar zoomable-img">`:`<div class="entrenador-avatar entrenador-avatar-vacio">${(s.entrenadorNombre||'?')[0].toUpperCase()}</div>`}
             <div>
               <div class="sesion-cliente">${s.cliente}</div>
               <div class="sesion-entrenador">${s.entrenadorNombre} ${s.entrenadorCodigo?'· '+s.entrenadorCodigo:''}</div>
@@ -3609,7 +3609,7 @@ function renderAccesorios(){
   if(!accesoriosData.length){ cont.innerHTML='<div class="empty">Todavía no hay accesorios cargados</div>'; return; }
   cont.innerHTML = accesoriosData.map(a=>`
     <div class="accesorio-card">
-      ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
+      ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini zoomable-img">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
       <div class="accesorio-info">
         <div class="accesorio-nombre">${a.nombre}</div>
         <div class="accesorio-meta">${UBIC_LABEL[a.ubicacion]||a.ubicacion} · referencia: ${unidadTexto(a.cantidadRef, a.unidad)}</div>
@@ -3744,7 +3744,7 @@ function renderInventarioInstructor(){
       const dif = cant!==undefined && Number(cant)!==Number(a.cantidadRef);
       return `
       <div class="accesorio-card">
-        ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
+        ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini zoomable-img">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
         <div class="accesorio-info">
           <div class="accesorio-nombre">${a.nombre}</div>
           <div class="inventario-ref">debería haber: ${unidadTexto(a.cantidadRef, a.unidad)}</div>
@@ -3829,7 +3829,7 @@ async function renderInventarioLectura(){
     else {
       html += difs.map(a=>`
         <div class="accesorio-card">
-          ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
+          ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini zoomable-img">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
           <div class="accesorio-info">
             <div class="accesorio-nombre">${a.nombre} <span class="inventario-check-estado inventario-check-dif">contados: ${unidadTexto(ultimaConDatos.d.items[a.id], a.unidad)} / debería: ${unidadTexto(a.cantidadRef, a.unidad)}</span></div>
           </div>
@@ -3838,3 +3838,21 @@ async function renderInventarioLectura(){
   }
   cont.innerHTML = html;
 }
+
+// ============================================================
+// LIGHTBOX — tocar cualquier foto chica (.zoomable-img) la abre en
+// grande. Un solo listener delegado: funciona para fotos que ya
+// existen Y para las que se agreguen después (listas que se vuelven
+// a pintar), sin tener que cablear un onclick en cada <img>.
+// ============================================================
+document.addEventListener('click', function(e){
+  const img = e.target.closest('.zoomable-img');
+  if(img && img.tagName==='IMG' && img.src){
+    document.getElementById('lightbox-img').src = img.src;
+    document.getElementById('lightbox').classList.add('open');
+  }
+});
+window.cerrarLightbox = function(){
+  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox-img').src = '';
+};
