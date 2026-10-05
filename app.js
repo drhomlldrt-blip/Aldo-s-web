@@ -137,7 +137,12 @@ window.doLogin = async function(){
   }
 
   try {
-    const snap = await getDoc(doc(db,'usuarios',u));
+    // Primero busca con el formato nuevo (documento por sucursal, a
+    // prueba de choques de nombre entre sucursales). Si no existe,
+    // cae al formato antiguo (ID = solo el username) para que las
+    // cuentas creadas antes de esta corrección sigan funcionando.
+    let snap = await getDoc(doc(db,'usuarios',`${currentSuc}__${u}`));
+    if(!snap.exists()) snap = await getDoc(doc(db,'usuarios',u));
     if(!snap.exists()){ hideLoading(); err.textContent='Usuario no encontrado'; err.style.display='block'; return; }
     const user = snap.data();
     if(user.pass !== p){ hideLoading(); err.textContent='Contraseña incorrecta'; err.style.display='block'; return; }
@@ -204,6 +209,8 @@ function activarPanelTab(panelId, siloso){
   if(panelId==='panel-agenda')     initAgendaPanel();
   if(panelId==='panel-ops')        initOpsPanel();
   if(panelId==='panel-admin')      cargarUsuarios();
+  if(panelId==='panel-accesorios') cargarAccesorios();
+  if(panelId==='panel-inventario') initInventarioPanel();
   if(panelId==='panel-aerobicos')  initClasesPanel('aerobicos');
   if(panelId==='panel-spinning')   initClasesPanel('spinning');
 }
@@ -212,7 +219,7 @@ async function loadDash(){
  try{
   document.getElementById('dash-suc').textContent  = currentSuc;
   document.getElementById('dash-user').textContent = currentUser.name;
-  document.getElementById('dash-role').textContent = {supervisor:'Supervisor',recepcionista:'Recepcionista',limpieza:'Limpieza'}[currentUser.role]||currentUser.role;
+  document.getElementById('dash-role').textContent = {supervisor:'Supervisor',recepcionista:'Recepcionista',limpieza:'Limpieza',instructor:'Instructor'}[currentUser.role]||currentUser.role;
 
   // Botón cambiar sucursal solo para supervisor
   const btnCambiar = document.getElementById('btn-cambiar-suc');
@@ -238,31 +245,42 @@ async function loadDash(){
         {id:'panel-spinning',  label:'Spinning'},
       ]},
       {id:'pt', label:'👤 Entrenadores PT', tabs:[
-        {id:'panel-pt', label:'Entrenadores PT'},
+        {id:'panel-pt',         label:'Entrenadores PT'},
+        {id:'panel-inventario', label:'Conteo accesorios'},
       ]},
       {id:'admin', label:'⚙ Administración', tabs:[
-        {id:'panel-agenda',  label:'Agenda'},
-        {id:'panel-ops',     label:'Operaciones'},
-        {id:'panel-alertas', label:'Alertas'},
-        {id:'panel-admin',   label:'Usuarios'},
+        {id:'panel-admin',      label:'Usuarios'},
+        {id:'panel-accesorios', label:'Accesorios'},
+        // Agenda, Operaciones y Alertas se sacaron del menú a pedido
+        // (no se usaban). El código y los datos siguen intactos, solo
+        // no hay pestaña que lleve a ellos; para reactivarlas basta
+        // con devolver estas 3 líneas:
+        // {id:'panel-agenda',  label:'Agenda'},
+        // {id:'panel-ops',     label:'Operaciones'},
+        // {id:'panel-alertas', label:'Alertas'},
       ]},
     ];
   } else if(currentUser.role==='recepcionista'){
     tabs=[
-      {id:'panel-revision',  label:'Revisión áreas'},
-      {id:'panel-reportes',  label:'Mis reportes'},
-      {id:'panel-aerobicos', label:'Aeróbicos'},
-      {id:'panel-spinning',  label:'Spinning'},
-      {id:'panel-pt',        label:'Entrenadores PT'},
+      {id:'panel-revision',   label:'Revisión áreas'},
+      {id:'panel-reportes',   label:'Mis reportes'},
+      {id:'panel-aerobicos',  label:'Aeróbicos'},
+      {id:'panel-spinning',   label:'Spinning'},
+      {id:'panel-pt',         label:'Entrenadores PT'},
+      {id:'panel-inventario', label:'Conteo accesorios'},
     ];
   } else if(currentUser.role==='limpieza'){
     tabs=[
       {id:'panel-checklist', label:'Mis tareas'},
       {id:'panel-reportes',  label:'Reportes a atender'},
     ];
+  } else if(currentUser.role==='instructor'){
+    tabs=[
+      {id:'panel-inventario', label:'Conteo de accesorios'},
+    ];
   }
 
-  const allPanels=['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin','panel-aerobicos','panel-spinning','panel-pt','panel-agenda','panel-ops'];
+  const allPanels=['panel-checklist','panel-reportes','panel-revision','panel-historial','panel-alertas','panel-admin','panel-accesorios','panel-inventario','panel-aerobicos','panel-spinning','panel-pt','panel-agenda','panel-ops'];
   allPanels.forEach(p=>{ const el=document.getElementById(p); if(el) el.classList.remove('active'); else console.warn('Panel no encontrado en el HTML:', p); });
   window._allPanelsDash = allPanels;
 
@@ -285,7 +303,9 @@ async function loadDash(){
 
   await Promise.all([renderChecklist(), cargarReportes()]);
   if(currentUser.role==='recepcionista') renderRevision();
-  if(currentUser.role==='supervisor')    cargarAlertas();
+  // Alertas se sacó del menú de Administración (no se usaba), así que
+  // ya no se llama acá para que no quede un numerito pegado al botón
+  // de "Administración" sin ningún lado donde verlo.
   hideLoading();
   show('screen-dash');
  } catch(e){
@@ -1036,20 +1056,23 @@ async function cargarUsuarios(){
     const snap=await getDocs(q);
     usuarios=snap.docs.map(d=>({id:d.id,...d.data()}));
   } catch(e){ usuarios=[]; }
-  const roleColor={supervisor:'color:#e8c14a',recepcionista:'color:#4ae8a0',limpieza:'color:#e8904a'};
+  const roleColor={supervisor:'color:#e8c14a',recepcionista:'color:#4ae8a0',limpieza:'color:#e8904a',instructor:'color:#c084fc'};
   let html=`<div class="user-row">
     <div class="user-info"><div class="user-name">Supervisor General</div>
     <div class="user-detail">@admin · <span style="color:#e8c14a">supervisor</span></div></div>
   </div>`;
-  html+=usuarios.map(u=>`
+  html+=usuarios.map(u=>{
+    const uname = u.username || u.id; // docs viejos no tienen 'username': el ID ES el username
+    return `
     <div class="user-row">
       <div class="user-info">
         <div class="user-name">${u.name}</div>
-        <div class="user-detail">@${u.id} · <span style="${roleColor[u.role]||''}">${u.role}</span> · ${turnoLabel(u.turno)}</div>
+        <div class="user-detail">@${uname} · <span style="${roleColor[u.role]||''}">${u.role}</span> · ${turnoLabel(u.turno)}</div>
       </div>
-      <button class="btn-sesion" onclick="cerrarSesionDeUsuario('${u.id}')">Cerrar sesión</button>
-      <button class="btn-del" onclick="eliminarUsuario('${u.id}')">Dar de baja</button>
-    </div>`).join('');
+      <button class="btn-sesion" onclick="cerrarSesionDeUsuario('${uname}')">Cerrar sesión</button>
+      <button class="btn-del" onclick="eliminarUsuario('${u.id}','${uname}')">Dar de baja</button>
+    </div>`;
+  }).join('');
   cont.innerHTML=html;
 }
 
@@ -1063,7 +1086,10 @@ window.cerrarSesionDeUsuario=async function(username){
   if(!confirm(`¿Cerrar la sesión activa de @${username}? Si tiene la app abierta en algún dispositivo, va a volver sola al inicio.`)) return;
   showLoading();
   try {
-    const q=query(collection(db,'sesiones_activas'),where('username','==',username),where('activa','==',true));
+    // Se filtra también por sucursal: si alguien en otra sucursal
+    // tiene el mismo nombre de usuario, esto evita cerrarle la sesión
+    // a esa otra persona por error.
+    const q=query(collection(db,'sesiones_activas'),where('username','==',username),where('sucursal','==',currentSuc),where('activa','==',true));
     const snap=await getDocs(q);
     if(snap.empty){ showToast('Ese usuario no tiene sesiones activas'); }
     else {
@@ -1088,7 +1114,33 @@ window.saveNewUser=async function(){
   if(!name||!user||!pass){ showToast('Completa todos los campos','err'); return; }
   showLoading();
   try {
-    await setDoc(doc(db,'usuarios',user),{name,pass,role,turno,suc:currentSuc,creadoEn:new Date().toISOString()});
+    // IMPORTANTE: antes el ID del documento era solo el nombre de
+    // usuario (ej. "luis"), compartido entre TODAS las sucursales.
+    // Si ese nombre ya existía en otra sucursal (activa o inactiva),
+    // crearlo acá lo sobrescribía por completo y se lo "robaba" a la
+    // otra sucursal sin avisar — eso causaba que cuentas desaparecieran
+    // solas. Ahora el documento queda por sucursal ("UPEA__luis"), así
+    // que dos sucursales nunca pueden pisarse la misma cuenta.
+    const idNuevo = `${currentSuc}__${user}`;
+    const existeNuevo = await getDoc(doc(db,'usuarios',idNuevo));
+    if(existeNuevo.exists()){
+      hideLoading();
+      showToast('Ya existe un usuario con ese nombre en esta sucursal','err');
+      return;
+    }
+    // Revisa también el formato viejo (ID = solo el username), por si
+    // ese nombre ya está tomado por una cuenta de ESTA U OTRA sucursal
+    // creada antes de esta corrección.
+    const legado = await getDoc(doc(db,'usuarios',user));
+    if(legado.exists()){
+      hideLoading();
+      const otraSuc = legado.data().suc;
+      showToast(otraSuc===currentSuc
+        ? 'Ya existe un usuario con ese nombre en esta sucursal (cuenta antigua)'
+        : `Ese nombre de usuario ya lo usa alguien de "${otraSuc}" — usa uno distinto (ej. ${user}2)`, 'err');
+      return;
+    }
+    await setDoc(doc(db,'usuarios',idNuevo),{name,pass,role,turno,suc:currentSuc,username:user,creadoEn:new Date().toISOString()});
     closeModal('modal-add-user');
     await cargarUsuarios();
     showToast('Usuario agregado correctamente');
@@ -1096,8 +1148,9 @@ window.saveNewUser=async function(){
   hideLoading();
 };
 
-window.eliminarUsuario=async function(id){
-  if(!confirm(`¿Dar de baja al usuario @${id}? Si tiene la app abierta en algún dispositivo, se le va a cerrar la sesión automáticamente.`)) return;
+window.eliminarUsuario=async function(docId, username){
+  const uname = username || docId;
+  if(!confirm(`¿Dar de baja al usuario @${uname}? Si tiene la app abierta en algún dispositivo, se le va a cerrar la sesión automáticamente.`)) return;
   showLoading();
   try {
     // Antes, dar de baja solo borraba el usuario de Firestore: si la
@@ -1106,11 +1159,11 @@ window.eliminarUsuario=async function(id){
     // de baja, también se cierran todas sus sesiones activas para
     // que quede sin acceso de inmediato (en menos de un minuto).
     try {
-      const q=query(collection(db,'sesiones_activas'),where('username','==',id),where('activa','==',true));
+      const q=query(collection(db,'sesiones_activas'),where('username','==',uname),where('sucursal','==',currentSuc),where('activa','==',true));
       const snap=await getDocs(q);
       await Promise.all(snap.docs.map(d=>updateDoc(doc(db,'sesiones_activas',d.id),{activa:false})));
     } catch(e){ /* si esto falla igual seguimos con la baja del usuario */ }
-    await deleteDoc(doc(db,'usuarios',id));
+    await deleteDoc(doc(db,'usuarios',docId));
     await cargarUsuarios();
     showToast('Usuario dado de baja y sesión cerrada');
   } catch(e){ showToast('Error','err'); }
@@ -1838,7 +1891,7 @@ window.abrirModalSesiones = async function(){
   cont.innerHTML = '<div class="empty">Cargando...</div>';
   try{
     const username = currentUser.username||currentUser.name;
-    const q = query(collection(db,'sesiones_activas'), where('username','==',username), where('activa','==',true));
+    const q = query(collection(db,'sesiones_activas'), where('username','==',username), where('sucursal','==',currentSuc), where('activa','==',true));
     const snap = await getDocs(q);
     const propia = idDispositivoActual();
     const sesiones = snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.ultimaActividad||'').localeCompare(a.ultimaActividad||''));
@@ -1868,7 +1921,7 @@ window.cerrarTodasLasDemasSesiones = async function(){
   try{
     const username = currentUser.username||currentUser.name;
     const propia = idDispositivoActual();
-    const q = query(collection(db,'sesiones_activas'), where('username','==',username), where('activa','==',true));
+    const q = query(collection(db,'sesiones_activas'), where('username','==',username), where('sucursal','==',currentSuc), where('activa','==',true));
     const snap = await getDocs(q);
     await Promise.all(snap.docs.filter(d=>d.id!==propia).map(d=>updateDoc(doc(db,'sesiones_activas',d.id),{activa:false})));
     showToast('Se cerraron las demás sesiones');
@@ -1884,7 +1937,7 @@ window.cerrarTodasLasDemasSesiones = async function(){
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260909a';
+const APP_VERSION = '20260915c';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
@@ -3516,3 +3569,272 @@ window.guardarExpediente = async function(){
   } catch(e){ showToast('Error al guardar','err'); }
   hideLoading();
 };
+
+// ============================================================
+// ACCESORIOS — catálogo (Administración) + conteo por turno
+// (instructores). Un instructor cuenta al iniciar y al terminar su
+// turno; recepción y supervisor ven si ya se contó y si hay
+// diferencias contra la cantidad de referencia.
+// ============================================================
+let accesoriosData = [];
+let fotoAccesorioActual = null;
+let inventarioChecklistActual = {turno:'manana', momento:'inicio'};
+let inventarioRegistroActual = {};
+
+const UBIC_LABEL = {maquinas:'Sala de máquinas', recepcion:'Recepción'};
+const UNIDAD_LABEL = {unidad:'unidades', par:'pares'};
+function unidadTexto(cant, unidad){
+  if(unidad==='par') return `${cant} ${Number(cant)===1?'par':'pares'}`;
+  return `${cant} ${Number(cant)===1?'unidad':'unidades'}`;
+}
+
+function turnoDeAhora(){ return new Date().getHours() < 14 ? 'manana' : 'tarde'; }
+function conteoDocId(turno, momento){ return `${currentSuc}_${fechaHoy()}_${turno}_${momento}`; }
+
+// ------------------------------------------------------------
+// Catálogo (CRUD) — Administración → Accesorios
+// ------------------------------------------------------------
+window.cargarAccesorios = async function(){
+  const cont = document.getElementById('accesorios-container');
+  cont.innerHTML = '<div class="empty">Cargando...</div>';
+  try{
+    const snap = await getDocs(query(collection(db,'accesorios'), where('sucursal','==',currentSuc)));
+    accesoriosData = snap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e){ cont.innerHTML='<div class="empty">Error al cargar</div>'; return; }
+  renderAccesorios();
+};
+
+function renderAccesorios(){
+  const cont = document.getElementById('accesorios-container');
+  if(!accesoriosData.length){ cont.innerHTML='<div class="empty">Todavía no hay accesorios cargados</div>'; return; }
+  cont.innerHTML = accesoriosData.map(a=>`
+    <div class="accesorio-card">
+      ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
+      <div class="accesorio-info">
+        <div class="accesorio-nombre">${a.nombre}</div>
+        <div class="accesorio-meta">${UBIC_LABEL[a.ubicacion]||a.ubicacion} · referencia: ${unidadTexto(a.cantidadRef, a.unidad)}</div>
+      </div>
+      <button class="btn-cancel" onclick="abrirModalAccesorio('${a.id}')">Editar</button>
+    </div>`).join('');
+}
+
+window.previewFotoAccesorio = async function(input){
+  if(!input.files || !input.files[0]) return;
+  try{
+    fotoAccesorioActual = await comprimirImagen(input.files[0]);
+    const img = document.getElementById('accesorio-foto-preview');
+    img.src = fotoAccesorioActual; img.style.display='block';
+    document.getElementById('accesorio-foto-placeholder').style.display='none';
+  }catch(e){ showToast('No se pudo cargar la foto','err'); }
+};
+
+window.abrirModalAccesorio = function(id){
+  const a = id ? accesoriosData.find(x=>x.id===id) : null;
+  document.getElementById('modal-accesorio-titulo').textContent = a?'Editar accesorio':'Nuevo accesorio';
+  document.getElementById('accesorio-id-edit').value = id||'';
+  document.getElementById('accesorio-nombre').value = a?a.nombre:'';
+  document.getElementById('accesorio-ubicacion').value = a?a.ubicacion:'maquinas';
+  document.getElementById('accesorio-cantidad-ref').value = a?a.cantidadRef:'';
+  document.getElementById('accesorio-unidad').value = a?(a.unidad||'unidad'):'unidad';
+  fotoAccesorioActual = a?(a.foto||null):null;
+  const preview = document.getElementById('accesorio-foto-preview');
+  const placeholder = document.getElementById('accesorio-foto-placeholder');
+  if(fotoAccesorioActual){ preview.src=fotoAccesorioActual; preview.style.display='block'; placeholder.style.display='none'; }
+  else { preview.style.display='none'; placeholder.style.display='flex'; }
+  document.getElementById('accesorio-foto-cam').value='';
+  document.getElementById('accesorio-foto-gal').value='';
+  document.getElementById('btn-accesorio-borrar').style.display = a?'inline-block':'none';
+  document.getElementById('modal-accesorio').classList.add('open');
+};
+
+window.guardarAccesorio = async function(){
+  const id = document.getElementById('accesorio-id-edit').value;
+  const nombre = document.getElementById('accesorio-nombre').value.trim();
+  const ubicacion = document.getElementById('accesorio-ubicacion').value;
+  const cantidadRef = Number(document.getElementById('accesorio-cantidad-ref').value)||0;
+  const unidad = document.getElementById('accesorio-unidad').value;
+  if(!nombre){ showToast('Escribe el nombre','err'); return; }
+  showLoading();
+  try{
+    const data = {nombre, ubicacion, cantidadRef, unidad, foto:fotoAccesorioActual||null, sucursal:currentSuc};
+    if(id){ await updateDoc(doc(db,'accesorios',id), data); }
+    else { data.creadoEn=new Date().toISOString(); await setDoc(doc(collection(db,'accesorios')), data); }
+    closeModal('modal-accesorio');
+    await cargarAccesorios();
+    showToast('Guardado');
+  } catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
+};
+
+window.borrarAccesorio = async function(){
+  const id = document.getElementById('accesorio-id-edit').value;
+  if(!id) return;
+  if(!confirm('¿Eliminar este accesorio del catálogo? Esto no borra los conteos ya guardados.')) return;
+  showLoading();
+  try{
+    await deleteDoc(doc(db,'accesorios',id));
+    closeModal('modal-accesorio');
+    await cargarAccesorios();
+    showToast('Accesorio eliminado');
+  } catch(e){ showToast('Error','err'); }
+  hideLoading();
+};
+
+// ------------------------------------------------------------
+// Conteo — pestaña "Conteo accesorios" (instructor entra datos;
+// recepción y supervisor solo ven el estado y las diferencias)
+// ------------------------------------------------------------
+window.initInventarioPanel = async function(){
+  const cont = document.getElementById('inventario-container');
+  cont.innerHTML = '<div class="empty">Cargando...</div>';
+  try{
+    const snap = await getDocs(query(collection(db,'accesorios'), where('sucursal','==',currentSuc)));
+    accesoriosData = snap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e){ cont.innerHTML='<div class="empty">Error al cargar</div>'; return; }
+
+  if(currentUser.role==='instructor'){
+    inventarioChecklistActual = {turno: turnoDeAhora(), momento:'inicio'};
+    await cargarConteoActual();
+    renderInventarioInstructor();
+  } else {
+    await renderInventarioLectura();
+  }
+};
+
+async function cargarConteoActual(){
+  const { turno, momento } = inventarioChecklistActual;
+  try{
+    const snap = await getDoc(doc(db,'conteo_accesorios', conteoDocId(turno, momento)));
+    inventarioRegistroActual = snap.exists() ? (snap.data().items||{}) : {};
+  } catch(e){ inventarioRegistroActual = {}; }
+}
+
+window.cambiarChecklistInventario = async function(){
+  inventarioChecklistActual.turno = document.getElementById('inv-turno').value;
+  inventarioChecklistActual.momento = document.getElementById('inv-momento').value;
+  await cargarConteoActual();
+  renderInventarioInstructor();
+};
+
+function renderInventarioInstructor(){
+  const cont = document.getElementById('inventario-container');
+  if(!accesoriosData.length){
+    cont.innerHTML = '<div class="empty">Todavía no hay accesorios cargados en el catálogo. Pide al supervisor que los agregue en Administración → Accesorios.</div>';
+    return;
+  }
+  const porUbic = {};
+  accesoriosData.forEach(a=>{ (porUbic[a.ubicacion]=porUbic[a.ubicacion]||[]).push(a); });
+
+  let html = `
+    <div class="inventario-toolbar">
+      <select id="inv-turno" onchange="cambiarChecklistInventario()">
+        <option value="manana" ${inventarioChecklistActual.turno==='manana'?'selected':''}>Turno mañana</option>
+        <option value="tarde" ${inventarioChecklistActual.turno==='tarde'?'selected':''}>Turno tarde</option>
+      </select>
+      <select id="inv-momento" onchange="cambiarChecklistInventario()">
+        <option value="inicio" ${inventarioChecklistActual.momento==='inicio'?'selected':''}>Inicio de turno</option>
+        <option value="fin" ${inventarioChecklistActual.momento==='fin'?'selected':''}>Fin de turno</option>
+      </select>
+    </div>`;
+
+  Object.keys(porUbic).forEach(ubic=>{
+    html += `<div class="section-title">${UBIC_LABEL[ubic]||ubic}</div>`;
+    html += porUbic[ubic].map(a=>{
+      const cant = inventarioRegistroActual[a.id];
+      const dif = cant!==undefined && Number(cant)!==Number(a.cantidadRef);
+      return `
+      <div class="accesorio-card">
+        ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
+        <div class="accesorio-info">
+          <div class="accesorio-nombre">${a.nombre}</div>
+          <div class="inventario-ref">debería haber: ${unidadTexto(a.cantidadRef, a.unidad)}</div>
+        </div>
+        <input type="number" min="0" class="inventario-input ${dif?'dif':''}" id="inv-cant-${a.id}" value="${cant===undefined?'':cant}" placeholder="0" oninput="marcarDiferenciaInventario('${a.id}', ${a.cantidadRef})">
+      </div>`;
+    }).join('');
+  });
+
+  html += `<button class="btn-send" style="width:100%;margin-top:10px" onclick="guardarConteoInventario()">Guardar conteo</button>`;
+  cont.innerHTML = html;
+}
+
+window.marcarDiferenciaInventario = function(id, ref){
+  const input = document.getElementById(`inv-cant-${id}`);
+  if(!input) return;
+  const dif = input.value!=='' && Number(input.value)!==Number(ref);
+  input.classList.toggle('dif', dif);
+};
+
+window.guardarConteoInventario = async function(){
+  const { turno, momento } = inventarioChecklistActual;
+  const items = {};
+  accesoriosData.forEach(a=>{
+    const el = document.getElementById(`inv-cant-${a.id}`);
+    if(el && el.value!=='') items[a.id] = Number(el.value);
+  });
+  showLoading();
+  try{
+    await setDoc(doc(db,'conteo_accesorios', conteoDocId(turno, momento)), {
+      sucursal: currentSuc, fecha: fechaHoy(), turno, momento,
+      items, contadoPor: currentUser.name, hora: horaActual(),
+    });
+    inventarioRegistroActual = items;
+    showToast('Conteo guardado');
+  } catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
+};
+
+// ------------------------------------------------------------
+// Vista de lectura (recepción / supervisor): ¿ya contaron hoy? y
+// diferencias del último conteo contra la cantidad de referencia.
+// ------------------------------------------------------------
+async function renderInventarioLectura(){
+  const cont = document.getElementById('inventario-container');
+  const checkpoints = [
+    {turno:'manana', momento:'inicio', label:'Mañana · Inicio'},
+    {turno:'manana', momento:'fin',    label:'Mañana · Fin'},
+    {turno:'tarde',  momento:'inicio', label:'Tarde · Inicio'},
+    {turno:'tarde',  momento:'fin',    label:'Tarde · Fin'},
+  ];
+  let datos;
+  try{
+    datos = await Promise.all(checkpoints.map(c=>getDoc(doc(db,'conteo_accesorios', conteoDocId(c.turno,c.momento)))));
+  } catch(e){ cont.innerHTML = '<div class="empty">Error al cargar</div>'; return; }
+
+  let html = `<div class="section-title">Conteo de hoy (${fechaHoy()})</div>`;
+  let ultimaConDatos = null;
+  checkpoints.forEach((c,i)=>{
+    const snap = datos[i];
+    if(snap.exists()){
+      const d = snap.data();
+      html += `<div class="accesorio-card"><div class="accesorio-info">
+        <div class="accesorio-nombre">${c.label} <span class="inventario-check-estado inventario-check-ok">✓ Contado</span></div>
+        <div class="accesorio-meta">${d.contadoPor} · ${d.hora}</div>
+      </div></div>`;
+      ultimaConDatos = {c, d};
+    } else {
+      html += `<div class="accesorio-card"><div class="accesorio-info">
+        <div class="accesorio-nombre">${c.label} <span class="inventario-check-estado inventario-check-pend">Sin contar</span></div>
+      </div></div>`;
+    }
+  });
+
+  if(ultimaConDatos){
+    const difs = accesoriosData.filter(a=>{
+      const cant = ultimaConDatos.d.items[a.id];
+      return cant!==undefined && Number(cant)!==Number(a.cantidadRef);
+    });
+    html += `<div class="section-title">Diferencias — último conteo (${ultimaConDatos.c.label})</div>`;
+    if(!difs.length){ html += '<div class="empty">Sin diferencias ✓</div>'; }
+    else {
+      html += difs.map(a=>`
+        <div class="accesorio-card">
+          ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
+          <div class="accesorio-info">
+            <div class="accesorio-nombre">${a.nombre} <span class="inventario-check-estado inventario-check-dif">contados: ${unidadTexto(ultimaConDatos.d.items[a.id], a.unidad)} / debería: ${unidadTexto(a.cantidadRef, a.unidad)}</span></div>
+          </div>
+        </div>`).join('');
+    }
+  }
+  cont.innerHTML = html;
+}

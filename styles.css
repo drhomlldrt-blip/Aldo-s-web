@@ -912,3 +912,34 @@ textarea:focus{border-color:var(--neon)}
 .sesion-dispositivo-row:last-child{border-bottom:none}
 .sesion-dispositivo-nombre{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .sesion-dispositivo-meta{font-size:11px;color:var(--gray);margin-top:2px}
+
+/* ---------- Accesorios (catálogo + conteo) ---------- */
+.accesorio-card{
+  display:flex;align-items:center;gap:12px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;
+}
+.accesorio-foto-mini{width:48px;height:48px;border-radius:8px;object-fit:cover;background:var(--surface3);flex-shrink:0}
+.accesorio-foto-mini-vacia{
+  width:48px;height:48px;border-radius:8px;background:var(--surface3);display:flex;
+  align-items:center;justify-content:center;font-size:20px;flex-shrink:0;
+}
+.accesorio-info{flex:1}
+.accesorio-nombre{font-weight:600;font-size:14px;color:var(--text)}
+.accesorio-meta{font-size:11px;color:var(--text2)}
+.inventario-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.inventario-toolbar select{
+  background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+  border-radius:8px;padding:8px 10px;font-family:'DM Sans',sans-serif;
+}
+.inventario-input{
+  width:64px;text-align:center;background:var(--surface3);border:1px solid var(--border2);
+  color:var(--text);border-radius:6px;padding:6px;font-family:'DM Sans',sans-serif;font-size:14px;
+}
+.inventario-input.dif{border-color:var(--danger);color:var(--danger);font-weight:700}
+.inventario-ref{font-size:11px;color:var(--text2)}
+.inventario-check-estado{
+  display:inline-block;font-size:11px;padding:3px 8px;border-radius:20px;margin-left:6px;
+}
+.inventario-check-ok{background:rgba(74,232,160,0.15);color:#4ae8a0}
+.inventario-check-pend{background:rgba(255,255,255,0.08);color:var(--text2)}
+.inventario-check-dif{background:rgba(255,51,51,0.15);color:var(--danger)}

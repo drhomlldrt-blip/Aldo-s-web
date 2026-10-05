@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260909a">
+<link rel="stylesheet" href="styles.css?v=20260915c">
 </head>
 <body>
 
@@ -157,6 +157,17 @@
       <div class="admin-title">Usuarios de esta sucursal</div>
       <div id="admin-users"></div>
       <button class="add-user-btn" onclick="showAddUserModal()">+ Agregar usuario</button>
+    </div>
+    <div id="panel-accesorios" class="panel">
+      <div class="personal-toolbar">
+        <div class="admin-title" style="margin:0">Catálogo de accesorios</div>
+        <button class="btn-asignar" onclick="abrirModalAccesorio()">+ Agregar accesorio</button>
+      </div>
+      <div class="personal-nota">Esto es lo que los instructores van a ver para contar. La cantidad de referencia es "cuántos debería haber" — si el conteo no coincide, queda marcado.</div>
+      <div id="accesorios-container"><div class="empty">Cargando...</div></div>
+    </div>
+    <div id="panel-inventario" class="panel">
+      <div id="inventario-container"><div class="empty">Cargando...</div></div>
     </div>
     <div id="panel-pt" class="panel">
       <div class="clases-toolbar">
@@ -837,7 +848,7 @@ Sala de pesas completa..."></textarea></div>
     <div class="field"><label>Usuario (sin espacios)</label><input type="text" id="new-user" placeholder="Ej: maria.lopez"></div>
     <div class="field"><label>Contraseña</label><input type="password" id="new-pass"></div>
     <div class="field"><label>Rol</label>
-      <select id="new-role"><option value="recepcionista">Recepcionista</option><option value="limpieza">Limpieza</option></select>
+      <select id="new-role"><option value="recepcionista">Recepcionista</option><option value="limpieza">Limpieza</option><option value="instructor">Instructor</option></select>
     </div>
     <div class="field"><label>Turno</label>
       <select id="new-turno"><option value="manana">Mañana</option><option value="tarde">Tarde</option><option value="noche">Noche</option><option value="apoyo">Apoyo</option></select>
@@ -849,9 +860,51 @@ Sala de pesas completa..."></textarea></div>
   </div>
 </div>
 
+<!-- MODAL AGREGAR/EDITAR ACCESORIO -->
+<div class="modal-overlay" id="modal-accesorio">
+  <div class="modal">
+    <div class="modal-title" id="modal-accesorio-titulo">Nuevo accesorio</div>
+    <input type="hidden" id="accesorio-id-edit">
+    <div class="field">
+      <label>Foto</label>
+      <div style="display:flex;align-items:center;gap:12px">
+        <img id="accesorio-foto-preview" class="entrenador-avatar-grande" style="display:none">
+        <div id="accesorio-foto-placeholder" class="entrenador-avatar-grande entrenador-avatar-vacio">🏋</div>
+        <div class="foto-btns" style="flex:1">
+          <button type="button" class="btn-foto" onclick="document.getElementById('accesorio-foto-cam').click()">📷 Tomar foto</button>
+          <button type="button" class="btn-foto" onclick="document.getElementById('accesorio-foto-gal').click()">🖼 Galería</button>
+        </div>
+      </div>
+      <input type="file" id="accesorio-foto-cam" accept="image/*" capture="environment" style="display:none" onchange="previewFotoAccesorio(this)">
+      <input type="file" id="accesorio-foto-gal" accept="image/*" style="display:none" onchange="previewFotoAccesorio(this)">
+    </div>
+    <div class="field"><label>Nombre</label><input type="text" id="accesorio-nombre" placeholder="Ej: Mancuerna 5kg"></div>
+    <div class="field-row">
+      <div class="field"><label>Ubicación</label>
+        <select id="accesorio-ubicacion">
+          <option value="maquinas">Sala de máquinas</option>
+          <option value="recepcion">Recepción</option>
+        </select>
+      </div>
+      <div class="field"><label>Cantidad de referencia</label><input type="number" id="accesorio-cantidad-ref" min="0" placeholder="Ej: 10"></div>
+    </div>
+    <div class="field"><label>Se cuenta por</label>
+      <select id="accesorio-unidad">
+        <option value="unidad">Unidades</option>
+        <option value="par">Pares</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-del" id="btn-accesorio-borrar" style="display:none" onclick="borrarAccesorio()">Eliminar</button>
+      <button class="btn-cancel" onclick="closeModal('modal-accesorio')">Cancelar</button>
+      <button class="btn-send" onclick="guardarAccesorio()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20260909a"></script>
+<script type="module" src="app.js?v=20260915c"></script>
 <!-- VISOR DE FOTO A PANTALLA COMPLETA (con zoom y forma clara de salir) -->
 <div class="modal-overlay" id="modal-foto-viewer" onclick="if(event.target===this) cerrarFotoGrande()">
   <div class="foto-viewer-content">
