@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260915d">
+<link rel="stylesheet" href="styles.css?v=20260915e">
 </head>
 <body>
 
@@ -905,12 +905,15 @@ Sala de pesas completa..."></textarea></div>
 <!-- LIGHTBOX: ver cualquier foto chica en grande (toca la foto para abrir) -->
 <div class="lightbox-overlay" id="lightbox" onclick="cerrarLightbox()">
   <span class="lightbox-cerrar">✕</span>
-  <img id="lightbox-img" src="">
+  <div class="lightbox-content">
+    <img id="lightbox-img" src="">
+    <div class="lightbox-caption" id="lightbox-caption"></div>
+  </div>
 </div>
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20260915d"></script>
+<script type="module" src="app.js?v=20260915e"></script>
 <!-- VISOR DE FOTO A PANTALLA COMPLETA (con zoom y forma clara de salir) -->
 <div class="modal-overlay" id="modal-foto-viewer" onclick="if(event.target===this) cerrarFotoGrande()">
   <div class="foto-viewer-content">
