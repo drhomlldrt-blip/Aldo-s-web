@@ -251,6 +251,7 @@ async function loadDash(){
       {id:'admin', label:'⚙ Administración', tabs:[
         {id:'panel-admin',      label:'Usuarios'},
         {id:'panel-accesorios', label:'Accesorios'},
+        {id:'panel-inventario', label:'Conteo accesorios'},
         // Agenda, Operaciones y Alertas se sacaron del menú a pedido
         // (no se usaban). El código y los datos siguen intactos, solo
         // no hay pestaña que lleve a ellos; para reactivarlas basta
@@ -301,8 +302,23 @@ async function loadDash(){
 
   turnoVista = currentUser.turno || detectarTurno();
 
-  await Promise.all([renderChecklist(), cargarReportes()]);
-  if(currentUser.role==='recepcionista') renderRevision();
+  // El checklist de limpieza y los reportes no le sirven de nada a un
+  // instructor (ese rol solo usa "Conteo de accesorios"), así que no
+  // tiene sentido cargarlos para ese rol — y de paso, si algo de eso
+  // llegara a fallar, ya no se lleva puesto el resto del panel.
+  if(currentUser.role!=='instructor'){
+    // Promise.allSettled en vez de Promise.all: si UNA de las dos
+    // falla (ej. sin permisos en Firestore para algo puntual), la
+    // otra igual carga y el panel se termina de mostrar — antes, un
+    // solo error acá tiraba abajo TODO el ingreso al panel y la
+    // persona se quedaba pegada en la pantalla de inicio con el
+    // aviso de error, sin poder ver nada de lo que sí se guardó.
+    const resultados = await Promise.allSettled([renderChecklist(), cargarReportes()]);
+    resultados.forEach(r=>{ if(r.status==='rejected') console.error('Error cargando panel:', r.reason); });
+    if(currentUser.role==='recepcionista'){
+      try{ renderRevision(); } catch(e){ console.error('Error en renderRevision:', e); }
+    }
+  }
   // Alertas se sacó del menú de Administración (no se usaba), así que
   // ya no se llama acá para que no quede un numerito pegado al botón
   // de "Administración" sin ningún lado donde verlo.
@@ -1746,6 +1762,288 @@ window.borrarEspecial=async function(){
 };
 
 // ============================================================
+// ACCESORIOS — catálogo (Administración) + conteo por turno
+// (instructores). Un instructor cuenta al iniciar y al terminar su
+// turno; recepción y supervisor ven si ya se contó y si hay
+// diferencias contra la cantidad de referencia.
+// ============================================================
+let accesoriosData = [];
+let fotoAccesorioActual = null;
+let inventarioChecklistActual = {turno:'manana', momento:'inicio'};
+let inventarioRegistroActual = {};
+
+const UBIC_LABEL = {maquinas:'Sala de máquinas', recepcion:'Recepción'};
+const UNIDAD_LABEL = {unidad:'unidades', par:'pares'};
+function unidadTexto(cant, unidad){
+  if(unidad==='par') return `${cant} ${Number(cant)===1?'par':'pares'}`;
+  return `${cant} ${Number(cant)===1?'unidad':'unidades'}`;
+}
+
+function turnoDeAhora(){ return new Date().getHours() < 14 ? 'manana' : 'tarde'; }
+function conteoDocId(turno, momento){ return `${currentSuc}_${fechaHoy()}_${turno}_${momento}`; }
+
+// ------------------------------------------------------------
+// Catálogo (CRUD) — Administración → Accesorios
+// ------------------------------------------------------------
+window.cargarAccesorios = async function(){
+  const cont = document.getElementById('accesorios-container');
+  cont.innerHTML = '<div class="empty">Cargando...</div>';
+  try{
+    const snap = await getDocs(query(collection(db,'accesorios'), where('sucursal','==',currentSuc)));
+    accesoriosData = snap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e){ cont.innerHTML='<div class="empty">Error al cargar</div>'; return; }
+  renderAccesorios();
+};
+
+function renderAccesorios(){
+  const cont = document.getElementById('accesorios-container');
+  if(!accesoriosData.length){ cont.innerHTML='<div class="empty">Todavía no hay accesorios cargados</div>'; return; }
+  cont.innerHTML = accesoriosData.map(a=>{
+    const reserva = a.cantidadReserva||0;
+    const defectuosa = a.cantidadDefectuosa||0;
+    let extra = '';
+    if(reserva>0) extra += ` · en reserva: ${unidadTexto(reserva, a.unidad)}`;
+    if(defectuosa>0) extra += ` · <span class="accesorio-defectuoso">defectuosos: ${unidadTexto(defectuosa, a.unidad)}${a.notaDefectuosa?` (${a.notaDefectuosa})`:''}</span>`;
+    return `
+    <div class="accesorio-card">
+      ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini zoomable-img" alt="${a.nombre}">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
+      <div class="accesorio-info">
+        <div class="accesorio-nombre">${a.nombre}</div>
+        <div class="accesorio-meta">${UBIC_LABEL[a.ubicacion]||a.ubicacion} · en uso: ${unidadTexto(a.cantidadRef, a.unidad)}${extra}</div>
+      </div>
+      <button class="btn-cancel" onclick="abrirModalAccesorio('${a.id}')">Editar</button>
+    </div>`;
+  }).join('');
+}
+
+window.previewFotoAccesorio = async function(input){
+  if(!input.files || !input.files[0]) return;
+  try{
+    fotoAccesorioActual = await comprimirImagen(input.files[0]);
+    const img = document.getElementById('accesorio-foto-preview');
+    img.src = fotoAccesorioActual; img.style.display='block';
+    document.getElementById('accesorio-foto-placeholder').style.display='none';
+  }catch(e){ showToast('No se pudo cargar la foto','err'); }
+};
+
+window.abrirModalAccesorio = function(id){
+  const a = id ? accesoriosData.find(x=>x.id===id) : null;
+  document.getElementById('modal-accesorio-titulo').textContent = a?'Editar accesorio':'Nuevo accesorio';
+  document.getElementById('accesorio-id-edit').value = id||'';
+  document.getElementById('accesorio-nombre').value = a?a.nombre:'';
+  document.getElementById('accesorio-ubicacion').value = a?a.ubicacion:'maquinas';
+  document.getElementById('accesorio-cantidad-ref').value = a?a.cantidadRef:'';
+  document.getElementById('accesorio-cantidad-reserva').value = a?(a.cantidadReserva||0):0;
+  document.getElementById('accesorio-cantidad-defectuosa').value = a?(a.cantidadDefectuosa||0):0;
+  document.getElementById('accesorio-nota-defectuosa').value = a?(a.notaDefectuosa||''):'';
+  document.getElementById('accesorio-unidad').value = a?(a.unidad||'unidad'):'unidad';
+  fotoAccesorioActual = a?(a.foto||null):null;
+  const preview = document.getElementById('accesorio-foto-preview');
+  const placeholder = document.getElementById('accesorio-foto-placeholder');
+  if(fotoAccesorioActual){ preview.src=fotoAccesorioActual; preview.style.display='block'; placeholder.style.display='none'; }
+  else { preview.style.display='none'; placeholder.style.display='flex'; }
+  document.getElementById('accesorio-foto-cam').value='';
+  document.getElementById('accesorio-foto-gal').value='';
+  document.getElementById('btn-accesorio-borrar').style.display = a?'inline-block':'none';
+  document.getElementById('modal-accesorio').classList.add('open');
+};
+
+window.guardarAccesorio = async function(){
+  const id = document.getElementById('accesorio-id-edit').value;
+  const nombre = document.getElementById('accesorio-nombre').value.trim();
+  const ubicacion = document.getElementById('accesorio-ubicacion').value;
+  const cantidadRef = Number(document.getElementById('accesorio-cantidad-ref').value)||0;
+  const cantidadReserva = Number(document.getElementById('accesorio-cantidad-reserva').value)||0;
+  const cantidadDefectuosa = Number(document.getElementById('accesorio-cantidad-defectuosa').value)||0;
+  const notaDefectuosa = document.getElementById('accesorio-nota-defectuosa').value.trim();
+  const unidad = document.getElementById('accesorio-unidad').value;
+  if(!nombre){ showToast('Escribe el nombre','err'); return; }
+  showLoading();
+  try{
+    const data = {nombre, ubicacion, cantidadRef, cantidadReserva, cantidadDefectuosa, notaDefectuosa, unidad, foto:fotoAccesorioActual||null, sucursal:currentSuc};
+    if(id){ await updateDoc(doc(db,'accesorios',id), data); }
+    else { data.creadoEn=new Date().toISOString(); await setDoc(doc(collection(db,'accesorios')), data); }
+    closeModal('modal-accesorio');
+    await cargarAccesorios();
+    showToast('Guardado');
+  } catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
+};
+
+window.borrarAccesorio = async function(){
+  const id = document.getElementById('accesorio-id-edit').value;
+  if(!id) return;
+  if(!confirm('¿Eliminar este accesorio del catálogo? Esto no borra los conteos ya guardados.')) return;
+  showLoading();
+  try{
+    await deleteDoc(doc(db,'accesorios',id));
+    closeModal('modal-accesorio');
+    await cargarAccesorios();
+    showToast('Accesorio eliminado');
+  } catch(e){ showToast('Error','err'); }
+  hideLoading();
+};
+
+// ------------------------------------------------------------
+// Conteo — pestaña "Conteo accesorios" (instructor entra datos;
+// recepción y supervisor solo ven el estado y las diferencias)
+// ------------------------------------------------------------
+window.initInventarioPanel = async function(){
+  const cont = document.getElementById('inventario-container');
+  cont.innerHTML = '<div class="empty">Cargando...</div>';
+  try{
+    const snap = await getDocs(query(collection(db,'accesorios'), where('sucursal','==',currentSuc)));
+    accesoriosData = snap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e){ cont.innerHTML='<div class="empty">Error al cargar</div>'; return; }
+
+  if(currentUser.role==='instructor'){
+    inventarioChecklistActual = {turno: turnoDeAhora(), momento:'inicio'};
+    await cargarConteoActual();
+    renderInventarioInstructor();
+  } else {
+    await renderInventarioLectura();
+  }
+};
+
+async function cargarConteoActual(){
+  const { turno, momento } = inventarioChecklistActual;
+  try{
+    const snap = await getDoc(doc(db,'conteo_accesorios', conteoDocId(turno, momento)));
+    inventarioRegistroActual = snap.exists() ? (snap.data().items||{}) : {};
+  } catch(e){ inventarioRegistroActual = {}; }
+}
+
+window.cambiarChecklistInventario = async function(){
+  inventarioChecklistActual.turno = document.getElementById('inv-turno').value;
+  inventarioChecklistActual.momento = document.getElementById('inv-momento').value;
+  await cargarConteoActual();
+  renderInventarioInstructor();
+};
+
+function renderInventarioInstructor(){
+  const cont = document.getElementById('inventario-container');
+  if(!accesoriosData.length){
+    cont.innerHTML = '<div class="empty">Todavía no hay accesorios cargados en el catálogo. Pide al supervisor que los agregue en Administración → Accesorios.</div>';
+    return;
+  }
+  const porUbic = {};
+  accesoriosData.forEach(a=>{ (porUbic[a.ubicacion]=porUbic[a.ubicacion]||[]).push(a); });
+
+  let html = `
+    <div class="inventario-toolbar">
+      <select id="inv-turno" onchange="cambiarChecklistInventario()">
+        <option value="manana" ${inventarioChecklistActual.turno==='manana'?'selected':''}>Turno mañana</option>
+        <option value="tarde" ${inventarioChecklistActual.turno==='tarde'?'selected':''}>Turno tarde</option>
+      </select>
+      <select id="inv-momento" onchange="cambiarChecklistInventario()">
+        <option value="inicio" ${inventarioChecklistActual.momento==='inicio'?'selected':''}>Inicio de turno</option>
+        <option value="fin" ${inventarioChecklistActual.momento==='fin'?'selected':''}>Fin de turno</option>
+      </select>
+    </div>`;
+
+  Object.keys(porUbic).forEach(ubic=>{
+    html += `<div class="section-title">${UBIC_LABEL[ubic]||ubic}</div>`;
+    html += porUbic[ubic].map(a=>{
+      const cant = inventarioRegistroActual[a.id];
+      const dif = cant!==undefined && Number(cant)!==Number(a.cantidadRef);
+      return `
+      <div class="accesorio-card">
+        ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini zoomable-img" alt="${a.nombre}">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
+        <div class="accesorio-info">
+          <div class="accesorio-nombre">${a.nombre}</div>
+          <div class="inventario-ref">debería haber: ${unidadTexto(a.cantidadRef, a.unidad)}</div>
+        </div>
+        <input type="number" min="0" class="inventario-input ${dif?'dif':''}" id="inv-cant-${a.id}" value="${cant===undefined?'':cant}" placeholder="0" oninput="marcarDiferenciaInventario('${a.id}', ${a.cantidadRef})">
+      </div>`;
+    }).join('');
+  });
+
+  html += `<button class="btn-send" style="width:100%;margin-top:10px" onclick="guardarConteoInventario()">Guardar conteo</button>`;
+  cont.innerHTML = html;
+}
+
+window.marcarDiferenciaInventario = function(id, ref){
+  const input = document.getElementById(`inv-cant-${id}`);
+  if(!input) return;
+  const dif = input.value!=='' && Number(input.value)!==Number(ref);
+  input.classList.toggle('dif', dif);
+};
+
+window.guardarConteoInventario = async function(){
+  const { turno, momento } = inventarioChecklistActual;
+  const items = {};
+  accesoriosData.forEach(a=>{
+    const el = document.getElementById(`inv-cant-${a.id}`);
+    if(el && el.value!=='') items[a.id] = Number(el.value);
+  });
+  showLoading();
+  try{
+    await setDoc(doc(db,'conteo_accesorios', conteoDocId(turno, momento)), {
+      sucursal: currentSuc, fecha: fechaHoy(), turno, momento,
+      items, contadoPor: currentUser.name, hora: horaActual(),
+    });
+    inventarioRegistroActual = items;
+    showToast('Conteo guardado');
+  } catch(e){ showToast('Error al guardar','err'); }
+  hideLoading();
+};
+
+// ------------------------------------------------------------
+// Vista de lectura (recepción / supervisor): ¿ya contaron hoy? y
+// diferencias del último conteo contra la cantidad de referencia.
+// ------------------------------------------------------------
+async function renderInventarioLectura(){
+  const cont = document.getElementById('inventario-container');
+  const checkpoints = [
+    {turno:'manana', momento:'inicio', label:'Mañana · Inicio'},
+    {turno:'manana', momento:'fin',    label:'Mañana · Fin'},
+    {turno:'tarde',  momento:'inicio', label:'Tarde · Inicio'},
+    {turno:'tarde',  momento:'fin',    label:'Tarde · Fin'},
+  ];
+  let datos;
+  try{
+    datos = await Promise.all(checkpoints.map(c=>getDoc(doc(db,'conteo_accesorios', conteoDocId(c.turno,c.momento)))));
+  } catch(e){ cont.innerHTML = '<div class="empty">Error al cargar</div>'; return; }
+
+  let html = `<div class="section-title">Conteo de hoy (${fechaHoy()})</div>`;
+  let ultimaConDatos = null;
+  checkpoints.forEach((c,i)=>{
+    const snap = datos[i];
+    if(snap.exists()){
+      const d = snap.data();
+      html += `<div class="accesorio-card"><div class="accesorio-info">
+        <div class="accesorio-nombre">${c.label} <span class="inventario-check-estado inventario-check-ok">✓ Contado</span></div>
+        <div class="accesorio-meta">${d.contadoPor} · ${d.hora}</div>
+      </div></div>`;
+      ultimaConDatos = {c, d};
+    } else {
+      html += `<div class="accesorio-card"><div class="accesorio-info">
+        <div class="accesorio-nombre">${c.label} <span class="inventario-check-estado inventario-check-pend">Sin contar</span></div>
+      </div></div>`;
+    }
+  });
+
+  if(ultimaConDatos){
+    const difs = accesoriosData.filter(a=>{
+      const cant = ultimaConDatos.d.items[a.id];
+      return cant!==undefined && Number(cant)!==Number(a.cantidadRef);
+    });
+    html += `<div class="section-title">Diferencias — último conteo (${ultimaConDatos.c.label})</div>`;
+    if(!difs.length){ html += '<div class="empty">Sin diferencias ✓</div>'; }
+    else {
+      html += difs.map(a=>`
+        <div class="accesorio-card">
+          ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini zoomable-img" alt="${a.nombre}">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
+          <div class="accesorio-info">
+            <div class="accesorio-nombre">${a.nombre} <span class="inventario-check-estado inventario-check-dif">contados: ${unidadTexto(ultimaConDatos.d.items[a.id], a.unidad)} / debería: ${unidadTexto(a.cantidadRef, a.unidad)}</span></div>
+          </div>
+        </div>`).join('');
+    }
+  }
+  cont.innerHTML = html;
+}
+
+// ============================================================
 // SESIÓN PERSISTENTE
 // Antes: al actualizar (F5) la página en cualquier pestaña, se
 // perdía la sesión y había que volver a poner usuario/contraseña.
@@ -1937,7 +2235,7 @@ window.cerrarTodasLasDemasSesiones = async function(){
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20260915e';
+const APP_VERSION = '20261006c';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
@@ -3570,274 +3868,6 @@ window.guardarExpediente = async function(){
   hideLoading();
 };
 
-// ============================================================
-// ACCESORIOS — catálogo (Administración) + conteo por turno
-// (instructores). Un instructor cuenta al iniciar y al terminar su
-// turno; recepción y supervisor ven si ya se contó y si hay
-// diferencias contra la cantidad de referencia.
-// ============================================================
-let accesoriosData = [];
-let fotoAccesorioActual = null;
-let inventarioChecklistActual = {turno:'manana', momento:'inicio'};
-let inventarioRegistroActual = {};
-
-const UBIC_LABEL = {maquinas:'Sala de máquinas', recepcion:'Recepción'};
-const UNIDAD_LABEL = {unidad:'unidades', par:'pares'};
-function unidadTexto(cant, unidad){
-  if(unidad==='par') return `${cant} ${Number(cant)===1?'par':'pares'}`;
-  return `${cant} ${Number(cant)===1?'unidad':'unidades'}`;
-}
-
-function turnoDeAhora(){ return new Date().getHours() < 14 ? 'manana' : 'tarde'; }
-function conteoDocId(turno, momento){ return `${currentSuc}_${fechaHoy()}_${turno}_${momento}`; }
-
-// ------------------------------------------------------------
-// Catálogo (CRUD) — Administración → Accesorios
-// ------------------------------------------------------------
-window.cargarAccesorios = async function(){
-  const cont = document.getElementById('accesorios-container');
-  cont.innerHTML = '<div class="empty">Cargando...</div>';
-  try{
-    const snap = await getDocs(query(collection(db,'accesorios'), where('sucursal','==',currentSuc)));
-    accesoriosData = snap.docs.map(d=>({id:d.id,...d.data()}));
-  } catch(e){ cont.innerHTML='<div class="empty">Error al cargar</div>'; return; }
-  renderAccesorios();
-};
-
-function renderAccesorios(){
-  const cont = document.getElementById('accesorios-container');
-  if(!accesoriosData.length){ cont.innerHTML='<div class="empty">Todavía no hay accesorios cargados</div>'; return; }
-  cont.innerHTML = accesoriosData.map(a=>`
-    <div class="accesorio-card">
-      ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini zoomable-img" alt="${a.nombre}">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
-      <div class="accesorio-info">
-        <div class="accesorio-nombre">${a.nombre}</div>
-        <div class="accesorio-meta">${UBIC_LABEL[a.ubicacion]||a.ubicacion} · referencia: ${unidadTexto(a.cantidadRef, a.unidad)}</div>
-      </div>
-      <button class="btn-cancel" onclick="abrirModalAccesorio('${a.id}')">Editar</button>
-    </div>`).join('');
-}
-
-window.previewFotoAccesorio = async function(input){
-  if(!input.files || !input.files[0]) return;
-  try{
-    fotoAccesorioActual = await comprimirImagen(input.files[0]);
-    const img = document.getElementById('accesorio-foto-preview');
-    img.src = fotoAccesorioActual; img.style.display='block';
-    document.getElementById('accesorio-foto-placeholder').style.display='none';
-  }catch(e){ showToast('No se pudo cargar la foto','err'); }
-};
-
-window.abrirModalAccesorio = function(id){
-  const a = id ? accesoriosData.find(x=>x.id===id) : null;
-  document.getElementById('modal-accesorio-titulo').textContent = a?'Editar accesorio':'Nuevo accesorio';
-  document.getElementById('accesorio-id-edit').value = id||'';
-  document.getElementById('accesorio-nombre').value = a?a.nombre:'';
-  document.getElementById('accesorio-ubicacion').value = a?a.ubicacion:'maquinas';
-  document.getElementById('accesorio-cantidad-ref').value = a?a.cantidadRef:'';
-  document.getElementById('accesorio-unidad').value = a?(a.unidad||'unidad'):'unidad';
-  fotoAccesorioActual = a?(a.foto||null):null;
-  const preview = document.getElementById('accesorio-foto-preview');
-  const placeholder = document.getElementById('accesorio-foto-placeholder');
-  if(fotoAccesorioActual){ preview.src=fotoAccesorioActual; preview.style.display='block'; placeholder.style.display='none'; }
-  else { preview.style.display='none'; placeholder.style.display='flex'; }
-  document.getElementById('accesorio-foto-cam').value='';
-  document.getElementById('accesorio-foto-gal').value='';
-  document.getElementById('btn-accesorio-borrar').style.display = a?'inline-block':'none';
-  document.getElementById('modal-accesorio').classList.add('open');
-};
-
-window.guardarAccesorio = async function(){
-  const id = document.getElementById('accesorio-id-edit').value;
-  const nombre = document.getElementById('accesorio-nombre').value.trim();
-  const ubicacion = document.getElementById('accesorio-ubicacion').value;
-  const cantidadRef = Number(document.getElementById('accesorio-cantidad-ref').value)||0;
-  const unidad = document.getElementById('accesorio-unidad').value;
-  if(!nombre){ showToast('Escribe el nombre','err'); return; }
-  showLoading();
-  try{
-    const data = {nombre, ubicacion, cantidadRef, unidad, foto:fotoAccesorioActual||null, sucursal:currentSuc};
-    if(id){ await updateDoc(doc(db,'accesorios',id), data); }
-    else { data.creadoEn=new Date().toISOString(); await setDoc(doc(collection(db,'accesorios')), data); }
-    closeModal('modal-accesorio');
-    await cargarAccesorios();
-    showToast('Guardado');
-  } catch(e){ showToast('Error al guardar','err'); }
-  hideLoading();
-};
-
-window.borrarAccesorio = async function(){
-  const id = document.getElementById('accesorio-id-edit').value;
-  if(!id) return;
-  if(!confirm('¿Eliminar este accesorio del catálogo? Esto no borra los conteos ya guardados.')) return;
-  showLoading();
-  try{
-    await deleteDoc(doc(db,'accesorios',id));
-    closeModal('modal-accesorio');
-    await cargarAccesorios();
-    showToast('Accesorio eliminado');
-  } catch(e){ showToast('Error','err'); }
-  hideLoading();
-};
-
-// ------------------------------------------------------------
-// Conteo — pestaña "Conteo accesorios" (instructor entra datos;
-// recepción y supervisor solo ven el estado y las diferencias)
-// ------------------------------------------------------------
-window.initInventarioPanel = async function(){
-  const cont = document.getElementById('inventario-container');
-  cont.innerHTML = '<div class="empty">Cargando...</div>';
-  try{
-    const snap = await getDocs(query(collection(db,'accesorios'), where('sucursal','==',currentSuc)));
-    accesoriosData = snap.docs.map(d=>({id:d.id,...d.data()}));
-  } catch(e){ cont.innerHTML='<div class="empty">Error al cargar</div>'; return; }
-
-  if(currentUser.role==='instructor'){
-    inventarioChecklistActual = {turno: turnoDeAhora(), momento:'inicio'};
-    await cargarConteoActual();
-    renderInventarioInstructor();
-  } else {
-    await renderInventarioLectura();
-  }
-};
-
-async function cargarConteoActual(){
-  const { turno, momento } = inventarioChecklistActual;
-  try{
-    const snap = await getDoc(doc(db,'conteo_accesorios', conteoDocId(turno, momento)));
-    inventarioRegistroActual = snap.exists() ? (snap.data().items||{}) : {};
-  } catch(e){ inventarioRegistroActual = {}; }
-}
-
-window.cambiarChecklistInventario = async function(){
-  inventarioChecklistActual.turno = document.getElementById('inv-turno').value;
-  inventarioChecklistActual.momento = document.getElementById('inv-momento').value;
-  await cargarConteoActual();
-  renderInventarioInstructor();
-};
-
-function renderInventarioInstructor(){
-  const cont = document.getElementById('inventario-container');
-  if(!accesoriosData.length){
-    cont.innerHTML = '<div class="empty">Todavía no hay accesorios cargados en el catálogo. Pide al supervisor que los agregue en Administración → Accesorios.</div>';
-    return;
-  }
-  const porUbic = {};
-  accesoriosData.forEach(a=>{ (porUbic[a.ubicacion]=porUbic[a.ubicacion]||[]).push(a); });
-
-  let html = `
-    <div class="inventario-toolbar">
-      <select id="inv-turno" onchange="cambiarChecklistInventario()">
-        <option value="manana" ${inventarioChecklistActual.turno==='manana'?'selected':''}>Turno mañana</option>
-        <option value="tarde" ${inventarioChecklistActual.turno==='tarde'?'selected':''}>Turno tarde</option>
-      </select>
-      <select id="inv-momento" onchange="cambiarChecklistInventario()">
-        <option value="inicio" ${inventarioChecklistActual.momento==='inicio'?'selected':''}>Inicio de turno</option>
-        <option value="fin" ${inventarioChecklistActual.momento==='fin'?'selected':''}>Fin de turno</option>
-      </select>
-    </div>`;
-
-  Object.keys(porUbic).forEach(ubic=>{
-    html += `<div class="section-title">${UBIC_LABEL[ubic]||ubic}</div>`;
-    html += porUbic[ubic].map(a=>{
-      const cant = inventarioRegistroActual[a.id];
-      const dif = cant!==undefined && Number(cant)!==Number(a.cantidadRef);
-      return `
-      <div class="accesorio-card">
-        ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini zoomable-img" alt="${a.nombre}">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
-        <div class="accesorio-info">
-          <div class="accesorio-nombre">${a.nombre}</div>
-          <div class="inventario-ref">debería haber: ${unidadTexto(a.cantidadRef, a.unidad)}</div>
-        </div>
-        <input type="number" min="0" class="inventario-input ${dif?'dif':''}" id="inv-cant-${a.id}" value="${cant===undefined?'':cant}" placeholder="0" oninput="marcarDiferenciaInventario('${a.id}', ${a.cantidadRef})">
-      </div>`;
-    }).join('');
-  });
-
-  html += `<button class="btn-send" style="width:100%;margin-top:10px" onclick="guardarConteoInventario()">Guardar conteo</button>`;
-  cont.innerHTML = html;
-}
-
-window.marcarDiferenciaInventario = function(id, ref){
-  const input = document.getElementById(`inv-cant-${id}`);
-  if(!input) return;
-  const dif = input.value!=='' && Number(input.value)!==Number(ref);
-  input.classList.toggle('dif', dif);
-};
-
-window.guardarConteoInventario = async function(){
-  const { turno, momento } = inventarioChecklistActual;
-  const items = {};
-  accesoriosData.forEach(a=>{
-    const el = document.getElementById(`inv-cant-${a.id}`);
-    if(el && el.value!=='') items[a.id] = Number(el.value);
-  });
-  showLoading();
-  try{
-    await setDoc(doc(db,'conteo_accesorios', conteoDocId(turno, momento)), {
-      sucursal: currentSuc, fecha: fechaHoy(), turno, momento,
-      items, contadoPor: currentUser.name, hora: horaActual(),
-    });
-    inventarioRegistroActual = items;
-    showToast('Conteo guardado');
-  } catch(e){ showToast('Error al guardar','err'); }
-  hideLoading();
-};
-
-// ------------------------------------------------------------
-// Vista de lectura (recepción / supervisor): ¿ya contaron hoy? y
-// diferencias del último conteo contra la cantidad de referencia.
-// ------------------------------------------------------------
-async function renderInventarioLectura(){
-  const cont = document.getElementById('inventario-container');
-  const checkpoints = [
-    {turno:'manana', momento:'inicio', label:'Mañana · Inicio'},
-    {turno:'manana', momento:'fin',    label:'Mañana · Fin'},
-    {turno:'tarde',  momento:'inicio', label:'Tarde · Inicio'},
-    {turno:'tarde',  momento:'fin',    label:'Tarde · Fin'},
-  ];
-  let datos;
-  try{
-    datos = await Promise.all(checkpoints.map(c=>getDoc(doc(db,'conteo_accesorios', conteoDocId(c.turno,c.momento)))));
-  } catch(e){ cont.innerHTML = '<div class="empty">Error al cargar</div>'; return; }
-
-  let html = `<div class="section-title">Conteo de hoy (${fechaHoy()})</div>`;
-  let ultimaConDatos = null;
-  checkpoints.forEach((c,i)=>{
-    const snap = datos[i];
-    if(snap.exists()){
-      const d = snap.data();
-      html += `<div class="accesorio-card"><div class="accesorio-info">
-        <div class="accesorio-nombre">${c.label} <span class="inventario-check-estado inventario-check-ok">✓ Contado</span></div>
-        <div class="accesorio-meta">${d.contadoPor} · ${d.hora}</div>
-      </div></div>`;
-      ultimaConDatos = {c, d};
-    } else {
-      html += `<div class="accesorio-card"><div class="accesorio-info">
-        <div class="accesorio-nombre">${c.label} <span class="inventario-check-estado inventario-check-pend">Sin contar</span></div>
-      </div></div>`;
-    }
-  });
-
-  if(ultimaConDatos){
-    const difs = accesoriosData.filter(a=>{
-      const cant = ultimaConDatos.d.items[a.id];
-      return cant!==undefined && Number(cant)!==Number(a.cantidadRef);
-    });
-    html += `<div class="section-title">Diferencias — último conteo (${ultimaConDatos.c.label})</div>`;
-    if(!difs.length){ html += '<div class="empty">Sin diferencias ✓</div>'; }
-    else {
-      html += difs.map(a=>`
-        <div class="accesorio-card">
-          ${a.foto?`<img src="${a.foto}" class="accesorio-foto-mini zoomable-img" alt="${a.nombre}">`:`<div class="accesorio-foto-mini-vacia">🏋</div>`}
-          <div class="accesorio-info">
-            <div class="accesorio-nombre">${a.nombre} <span class="inventario-check-estado inventario-check-dif">contados: ${unidadTexto(ultimaConDatos.d.items[a.id], a.unidad)} / debería: ${unidadTexto(a.cantidadRef, a.unidad)}</span></div>
-          </div>
-        </div>`).join('');
-    }
-  }
-  cont.innerHTML = html;
-}
 
 // ============================================================
 // LIGHTBOX — tocar cualquier foto chica (.zoomable-img) la abre en

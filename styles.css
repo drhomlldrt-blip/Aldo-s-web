@@ -926,6 +926,7 @@ textarea:focus{border-color:var(--neon)}
 .accesorio-info{flex:1}
 .accesorio-nombre{font-weight:600;font-size:14px;color:var(--text)}
 .accesorio-meta{font-size:11px;color:var(--text2)}
+.accesorio-defectuoso{color:var(--danger);font-weight:600}
 .inventario-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
 .inventario-toolbar select{
   background:var(--surface2);border:1px solid var(--border2);color:var(--text);

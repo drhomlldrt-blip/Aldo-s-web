@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260915e">
+<link rel="stylesheet" href="styles.css?v=20261006c">
 </head>
 <body>
 
@@ -886,13 +886,20 @@ Sala de pesas completa..."></textarea></div>
           <option value="recepcion">Recepción</option>
         </select>
       </div>
-      <div class="field"><label>Cantidad de referencia</label><input type="number" id="accesorio-cantidad-ref" min="0" placeholder="Ej: 10"></div>
+      <div class="field"><label>Se cuenta por</label>
+        <select id="accesorio-unidad">
+          <option value="unidad">Unidades</option>
+          <option value="par">Pares</option>
+        </select>
+      </div>
     </div>
-    <div class="field"><label>Se cuenta por</label>
-      <select id="accesorio-unidad">
-        <option value="unidad">Unidades</option>
-        <option value="par">Pares</option>
-      </select>
+    <div class="field-row">
+      <div class="field"><label>En uso (lo que cuenta el instructor)</label><input type="number" id="accesorio-cantidad-ref" min="0" placeholder="Ej: 10"></div>
+      <div class="field"><label>En reserva (nuevas, sin usar)</label><input type="number" id="accesorio-cantidad-reserva" min="0" placeholder="0"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Defectuosos / apartados</label><input type="number" id="accesorio-cantidad-defectuosa" min="0" placeholder="0"></div>
+      <div class="field"><label>Nota (opcional)</label><input type="text" id="accesorio-nota-defectuosa" placeholder="Ej: agarre roto, pedido el repuesto"></div>
     </div>
     <div class="modal-btns">
       <button class="btn-del" id="btn-accesorio-borrar" style="display:none" onclick="borrarAccesorio()">Eliminar</button>
@@ -913,7 +920,7 @@ Sala de pesas completa..."></textarea></div>
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20260915e"></script>
+<script type="module" src="app.js?v=20261006c"></script>
 <!-- VISOR DE FOTO A PANTALLA COMPLETA (con zoom y forma clara de salir) -->
 <div class="modal-overlay" id="modal-foto-viewer" onclick="if(event.target===this) cerrarFotoGrande()">
   <div class="foto-viewer-content">
