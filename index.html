@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20261006c">
+<link rel="stylesheet" href="styles.css?v=20261007a">
 </head>
 <body>
 
@@ -163,11 +163,14 @@
         <div class="admin-title" style="margin:0">Catálogo de accesorios</div>
         <button class="btn-asignar" onclick="abrirModalAccesorio()">+ Agregar accesorio</button>
       </div>
-      <div class="personal-nota">Esto es lo que los instructores van a ver para contar. La cantidad de referencia es "cuántos debería haber" — si el conteo no coincide, queda marcado.</div>
+      <div class="personal-nota">Esto es lo que los instructores ven para contar. “En uso” es lo que deben encontrar en sala; lo faltante o defectuoso se sigue en la pestaña Seguimiento.</div>
       <div id="accesorios-container"><div class="empty">Cargando...</div></div>
     </div>
     <div id="panel-inventario" class="panel">
       <div id="inventario-container"><div class="empty">Cargando...</div></div>
+    </div>
+    <div id="panel-seguimiento" class="panel">
+      <div id="seguimiento-container"><div class="empty">Cargando...</div></div>
     </div>
     <div id="panel-pt" class="panel">
       <div class="clases-toolbar">
@@ -894,18 +897,23 @@ Sala de pesas completa..."></textarea></div>
       </div>
     </div>
     <div class="field-row">
-      <div class="field"><label>En uso (lo que cuenta el instructor)</label><input type="number" id="accesorio-cantidad-ref" min="0" placeholder="Ej: 10"></div>
-      <div class="field"><label>En reserva (nuevas, sin usar)</label><input type="number" id="accesorio-cantidad-reserva" min="0" placeholder="0"></div>
+      <div class="field"><label>En uso (lo que debe haber en sala)</label><input type="number" id="accesorio-cantidad-ref" min="0" step="0.5" placeholder="Ej: 10"></div>
+      <div class="field"><label>En reserva (nuevas, sin usar)</label><input type="number" id="accesorio-cantidad-reserva" min="0" step="0.5" placeholder="0"></div>
     </div>
-    <div class="field-row">
-      <div class="field"><label>Defectuosos / apartados</label><input type="number" id="accesorio-cantidad-defectuosa" min="0" placeholder="0"></div>
-      <div class="field"><label>Nota (opcional)</label><input type="text" id="accesorio-nota-defectuosa" placeholder="Ej: agarre roto, pedido el repuesto"></div>
-    </div>
+    <div class="hint-sm">Para pares, medio par = un lado (ej. 4.5 = 4 pares y 1 lado). Los faltantes y defectuosos ya no se cargan acá: los reportan los instructores y los sigues en <b>Seguimiento</b>.</div>
     <div class="modal-btns">
-      <button class="btn-del" id="btn-accesorio-borrar" style="display:none" onclick="borrarAccesorio()">Eliminar</button>
+      <button class="btn-del" id="btn-accesorio-borrar" style="display:none" onclick="archivarAccesorio()">Archivar</button>
       <button class="btn-cancel" onclick="closeModal('modal-accesorio')">Cancelar</button>
       <button class="btn-send" onclick="guardarAccesorio()">Guardar</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL CASO DE SEGUIMIENTO (faltante / defectuoso) -->
+<div class="modal-overlay" id="modal-caso-acc">
+  <div class="modal modal-wide">
+    <div id="incidencia-detalle"></div>
+    <div class="modal-btns"><button class="btn-cancel" onclick="closeModal('modal-caso-acc')">Cerrar</button></div>
   </div>
 </div>
 
@@ -920,7 +928,7 @@ Sala de pesas completa..."></textarea></div>
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20261006c"></script>
+<script type="module" src="app.js?v=20261007a"></script>
 <!-- VISOR DE FOTO A PANTALLA COMPLETA (con zoom y forma clara de salir) -->
 <div class="modal-overlay" id="modal-foto-viewer" onclick="if(event.target===this) cerrarFotoGrande()">
   <div class="foto-viewer-content">
