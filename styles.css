@@ -1111,3 +1111,13 @@ textarea:focus{border-color:var(--neon)}
 .orden-btn:hover:not(:disabled){border-color:var(--neon);color:var(--neon)}
 .orden-btn:active:not(:disabled){transform:scale(.94)}
 .orden-btn:disabled{opacity:.25;cursor:default}
+
+/* ---------- Repositorio de nombres (sugerencias al crear un accesorio) ---------- */
+.acc-sug{margin:-4px 0 12px}
+.acc-sug:empty{display:none}
+.acc-sug-chips{display:flex;flex-wrap:wrap;gap:6px;max-height:112px;overflow-y:auto;padding:2px 0}
+.sug-chip{display:inline-flex;align-items:stretch;border:1px solid var(--border2);border-radius:20px;background:var(--surface3);overflow:hidden}
+.sug-nombre{background:none;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;padding:7px 10px;cursor:pointer}
+.sug-nombre:hover{color:var(--neon)}
+.sug-x{background:none;border:none;border-left:1px solid var(--border2);color:var(--text2);font-size:10px;padding:0 9px;cursor:pointer}
+.sug-x:hover{color:var(--danger)}

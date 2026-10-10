@@ -1787,6 +1787,8 @@ let accesoriosData = [];
 let casosAcc = [];
 let fotoAccesorioActual = null;
 let inventarioChecklistActual = {turno:'manana', momento:'inicio', zona:'recepcion'};
+let nombresRepo = [];        // repositorio de nombres compartido entre sucursales
+let nombresSugeridos = [];   // los que se muestran en el formulario (filtrados)
 let invUltimoSala = null;   // último conteo de sala de máquinas (para avisar cuánto hace)
 let invEstado = {};          // decisión del instructor por accesorio (borrador o guardado)
 let invAbierto = null;       // accesorio con el formulario "Falta algo" abierto
@@ -1806,6 +1808,7 @@ const ZONAS = {
   sala:      {label:'Sala de máquinas', ubicacion:'maquinas'},
 };
 function byId(id){ return document.getElementById(id); }
+function normNombre(n){ return String(n==null?'':n).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
 function escAcc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function turnoDeAhora(){ return new Date().getHours() < 14 ? 'manana' : 'tarde'; }
 function conteoDocId(turno, momento){ return `${currentSuc}_${fechaHoy()}_${turno}_${momento}`; }
@@ -1865,6 +1868,27 @@ async function normalizarOrden(ubicacion){
     if(g.orden!==k+1){ g.orden = k+1; tareas.push(updateDoc(doc(db,'accesorios',g.id),{orden:k+1})); }
   });
   await Promise.all(tareas);
+}
+// ---------- Repositorio de nombres ----------
+// Solo guarda NOMBRES (no fotos ni cantidades). Un nombre creado en cualquier sucursal
+// queda disponible en las demás; la foto, la unidad, la zona y las cantidades se
+// definen en cada una. Colección: nombres_accesorios (1 doc por nombre, ID = nombre normalizado).
+function nombreRepoId(n){ return encodeURIComponent(normNombre(n)).slice(0,200); }
+async function cargarNombresRepo(){
+  try{
+    const snap = await getDocs(collection(db,'nombres_accesorios'));
+    nombresRepo = snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),'es'));
+  }catch(e){ nombresRepo = []; }
+}
+async function agregarNombreRepo(nombre){
+  const id = nombreRepoId(nombre);
+  if(!id || nombresRepo.some(n=>n.id===id)) return;
+  try{
+    const data = {nombre:String(nombre).trim(), creadoEn:new Date().toISOString(), creadoPor:currentUser.name, sucursal:currentSuc};
+    await setDoc(doc(db,'nombres_accesorios', id), data);
+    nombresRepo.push({id, ...data});
+    nombresRepo.sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),'es'));
+  }catch(e){ console.error('No se pudo guardar el nombre en el repositorio:', e); }
 }
 function accesoriosActivos(){ return accesoriosData.filter(a=>a.activo!==false); }
 // Un caso "defectuoso" nuevo ya MOVIÓ las unidades de "en uso" a "defectuosos" al reportarse
@@ -1927,8 +1951,10 @@ function fotoMini(a){
 window.cargarAccesorios = async function(){
   const cont = byId('accesorios-container');
   cont.innerHTML = '<div class="empty">Cargando...</div>';
-  try{ await Promise.all([cargarAccesoriosDatos(), cargarIncidenciasDatos()]); }
+  try{ await Promise.all([cargarAccesoriosDatos(), cargarIncidenciasDatos(), cargarNombresRepo()]); }
   catch(e){ cont.innerHTML='<div class="empty">Error al cargar</div>'; return; }
+  // Los nombres que ya existen en esta sucursal pasan al repositorio (solo se escriben los que faltan)
+  for(const a of accesoriosData){ if(a.activo!==false) await agregarNombreRepo(a.nombre); }
   renderAccesorios();
 };
 
@@ -2014,6 +2040,7 @@ window.abrirModalAccesorio = function(id){
   byId('accesorio-foto-cam').value='';
   byId('accesorio-foto-gal').value='';
   byId('btn-accesorio-borrar').style.display = a?'inline-block':'none';
+  renderNombresSugeridos();
   byId('modal-accesorio').classList.add('open');
 };
 
@@ -2051,12 +2078,44 @@ window.guardarAccesorio = async function(){
       if((Number(prev.cantidadDefectuosa)||0)!==cantidadDefectuosa) cambios.push(`Defectuosos: ${cantTexto(prev.cantidadDefectuosa||0,prev.unidad)} → ${cantTexto(cantidadDefectuosa,unidad)}`);
       if(cambios.length) await registrarMovimiento({accesorioId:accId, accesorioNombre:nombre, tipo:'ajuste', detalle:'Ajuste manual — '+cambios.join(' · ')});
     }
+    await agregarNombreRepo(nombre);
     closeModal('modal-accesorio');
     await cargarAccesorios();
     if(cambiaZona){ await normalizarOrden(ubicacion); renderAccesorios(); }
     showToast('Guardado');
   } catch(e){ showToast('Error al guardar','err'); }
   hideLoading();
+};
+
+// Nombres disponibles de otras sucursales: se tocan para usarlos
+window.renderNombresSugeridos = function(){
+  const box = byId('acc-nombres-sug'); if(!box) return;
+  if(byId('accesorio-id-edit').value){ box.innerHTML = ''; return; }   // solo al crear
+  const tengo = new Set(accesoriosData.map(a=>normNombre(a.nombre)));    // lo que ya existe aquí no se ofrece
+  const q = normNombre(byId('accesorio-nombre').value);
+  nombresSugeridos = nombresRepo.filter(n=>{
+    const k = normNombre(n.nombre);
+    return !tengo.has(k) && k!==q && (!q || k.includes(q));
+  });
+  if(!nombresSugeridos.length){ box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="inc-label">Nombres de otras sucursales · toca para usar</div><div class="acc-sug-chips">` +
+    nombresSugeridos.map((n,i)=>`<span class="sug-chip"><button type="button" class="sug-nombre" onclick="usarNombreSugerido(${i})">${escAcc(n.nombre)}</button><button type="button" class="sug-x" aria-label="Quitar de la lista" onclick="quitarNombreRepo(${i})">✕</button></span>`).join('') +
+    `</div>`;
+};
+window.usarNombreSugerido = function(i){
+  const n = nombresSugeridos[i]; if(!n) return;
+  byId('accesorio-nombre').value = n.nombre;
+  renderNombresSugeridos();
+  byId('accesorio-cantidad-ref').focus();
+};
+window.quitarNombreRepo = async function(i){
+  const n = nombresSugeridos[i]; if(!n) return;
+  if(!confirm(`¿Quitar “${n.nombre}” de la lista de nombres? No borra ningún accesorio ya creado.`)) return;
+  try{
+    await deleteDoc(doc(db,'nombres_accesorios', n.id));
+    nombresRepo = nombresRepo.filter(x=>x.id!==n.id);
+    renderNombresSugeridos();
+  }catch(e){ showToast('No se pudo quitar el nombre','err'); }
 };
 
 // No se elimina: se archiva (deja de aparecerle a los instructores pero el historial queda)
@@ -2888,7 +2947,7 @@ window.cerrarTodasLasDemasSesiones = async function(){
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20261007c';
+const APP_VERSION = '20261009a';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});

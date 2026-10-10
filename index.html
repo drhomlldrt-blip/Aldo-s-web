@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GYM CONTROL</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20261007c">
+<link rel="stylesheet" href="styles.css?v=20261009a">
 </head>
 <body>
 
@@ -881,7 +881,8 @@ Sala de pesas completa..."></textarea></div>
       <input type="file" id="accesorio-foto-cam" accept="image/*" capture="environment" style="display:none" onchange="previewFotoAccesorio(this)">
       <input type="file" id="accesorio-foto-gal" accept="image/*" style="display:none" onchange="previewFotoAccesorio(this)">
     </div>
-    <div class="field"><label>Nombre</label><input type="text" id="accesorio-nombre" placeholder="Ej: Mancuerna 5kg"></div>
+    <div class="field"><label>Nombre</label><input type="text" id="accesorio-nombre" placeholder="Ej: Mancuerna 5kg" oninput="renderNombresSugeridos()" autocomplete="off"></div>
+    <div id="acc-nombres-sug" class="acc-sug"></div>
     <div class="field-row">
       <div class="field"><label>Ubicación</label>
         <select id="accesorio-ubicacion">
@@ -929,7 +930,7 @@ Sala de pesas completa..."></textarea></div>
 
 <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
-<script type="module" src="app.js?v=20261007c"></script>
+<script type="module" src="app.js?v=20261009a"></script>
 <!-- VISOR DE FOTO A PANTALLA COMPLETA (con zoom y forma clara de salir) -->
 <div class="modal-overlay" id="modal-foto-viewer" onclick="if(event.target===this) cerrarFotoGrande()">
   <div class="foto-viewer-content">
