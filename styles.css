@@ -1121,3 +1121,11 @@ textarea:focus{border-color:var(--neon)}
 .sug-nombre:hover{color:var(--neon)}
 .sug-x{background:none;border:none;border-left:1px solid var(--border2);color:var(--text2);font-size:10px;padding:0 9px;cursor:pointer}
 .sug-x:hover{color:var(--danger)}
+.acc-sug{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin:-2px 0 14px}
+.acc-sug .inc-label{margin-bottom:6px}
+.sug-guia{font-size:11px;color:var(--text2);margin-bottom:8px}
+.sug-vacio{font-size:12px;color:var(--text2);line-height:1.5}
+.sug-pie{margin-top:8px}
+.sug-buscar{background:none;border:1px solid rgba(249,115,22,.4);color:var(--neon);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;padding:7px 12px;cursor:pointer;margin-top:6px}
+.sug-pie .sug-buscar{margin-top:0;border-color:var(--border2);color:var(--text2);font-weight:500}
+.sug-buscar:hover{color:var(--neon);border-color:var(--neon)}

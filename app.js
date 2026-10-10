@@ -1880,11 +1880,11 @@ async function cargarNombresRepo(){
     nombresRepo = snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),'es'));
   }catch(e){ nombresRepo = []; }
 }
-async function agregarNombreRepo(nombre){
+async function agregarNombreRepo(nombre, sucursalOrigen){
   const id = nombreRepoId(nombre);
   if(!id || nombresRepo.some(n=>n.id===id)) return;
   try{
-    const data = {nombre:String(nombre).trim(), creadoEn:new Date().toISOString(), creadoPor:currentUser.name, sucursal:currentSuc};
+    const data = {nombre:String(nombre).trim(), creadoEn:new Date().toISOString(), creadoPor:currentUser.name, sucursal:sucursalOrigen||currentSuc};
     await setDoc(doc(db,'nombres_accesorios', id), data);
     nombresRepo.push({id, ...data});
     nombresRepo.sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),'es'));
@@ -2092,15 +2092,38 @@ window.renderNombresSugeridos = function(){
   const box = byId('acc-nombres-sug'); if(!box) return;
   if(byId('accesorio-id-edit').value){ box.innerHTML = ''; return; }   // solo al crear
   const tengo = new Set(accesoriosData.map(a=>normNombre(a.nombre)));    // lo que ya existe aquí no se ofrece
+  const disponibles = nombresRepo.filter(n=>!tengo.has(normNombre(n.nombre)));
   const q = normNombre(byId('accesorio-nombre').value);
-  nombresSugeridos = nombresRepo.filter(n=>{
-    const k = normNombre(n.nombre);
-    return !tengo.has(k) && k!==q && (!q || k.includes(q));
-  });
-  if(!nombresSugeridos.length){ box.innerHTML = ''; return; }
-  box.innerHTML = `<div class="inc-label">Nombres de otras sucursales · toca para usar</div><div class="acc-sug-chips">` +
-    nombresSugeridos.map((n,i)=>`<span class="sug-chip"><button type="button" class="sug-nombre" onclick="usarNombreSugerido(${i})">${escAcc(n.nombre)}</button><button type="button" class="sug-x" aria-label="Quitar de la lista" onclick="quitarNombreRepo(${i})">✕</button></span>`).join('') +
-    `</div>`;
+  nombresSugeridos = disponibles.filter(n=>{ const k = normNombre(n.nombre); return k!==q && (!q || k.includes(q)); });
+  const buscar = txt=>`<button type="button" class="sug-buscar" onclick="buscarNombresTodasSucursales()">${txt}</button>`;
+  let html = `<div class="inc-label">Nombres de otras sucursales</div>`;
+  if(!disponibles.length){
+    html += `<div class="sug-vacio">Todavía no hay nombres de otras sucursales para ofrecer. ${buscar('Buscar en todas las sucursales')}</div>`;
+  } else if(!nombresSugeridos.length){
+    html += `<div class="sug-vacio">Ningún nombre disponible coincide con lo que escribes.</div>`;
+  } else {
+    html += `<div class="sug-guia">Toca uno para usarlo</div><div class="acc-sug-chips">` +
+      nombresSugeridos.map((n,i)=>`<span class="sug-chip"><button type="button" class="sug-nombre" onclick="usarNombreSugerido(${i})">${escAcc(n.nombre)}</button><button type="button" class="sug-x" aria-label="Quitar de la lista" onclick="quitarNombreRepo(${i})">✕</button></span>`).join('') +
+      `</div><div class="sug-pie">${buscar('↻ Actualizar desde todas las sucursales')}</div>`;
+  }
+  box.innerHTML = html;
+};
+// Trae a la lista los nombres de TODAS las sucursales de una vez (lee los accesorios una sola vez)
+window.buscarNombresTodasSucursales = async function(){
+  showLoading();
+  try{
+    const snap = await getDocs(collection(db,'accesorios'));
+    let nuevos = 0;
+    for(const a of snap.docs.map(d=>d.data())){
+      if(a.activo===false || !a.nombre) continue;
+      const antes = nombresRepo.length;
+      await agregarNombreRepo(a.nombre, a.sucursal);
+      if(nombresRepo.length>antes) nuevos++;
+    }
+    renderNombresSugeridos();
+    showToast(nuevos ? `${nuevos} nombre${nuevos===1?'':'s'} nuevo${nuevos===1?'':'s'} en la lista` : 'No hay nombres nuevos en otras sucursales');
+  }catch(e){ console.error(e); showToast('No se pudo buscar','err'); }
+  hideLoading();
 };
 window.usarNombreSugerido = function(i){
   const n = nombresSugeridos[i]; if(!n) return;
@@ -2947,7 +2970,7 @@ window.cerrarTodasLasDemasSesiones = async function(){
 // una versión más nueva publicada y, si la hay, recarga la
 // página sola, sin que nadie tenga que hacer nada.
 // ============================================================
-const APP_VERSION = '20261009a';
+const APP_VERSION = '20261010a';
 setInterval(async ()=>{
   try{
     const r = await fetch('/version.json?t='+Date.now(), {cache:'no-store'});
